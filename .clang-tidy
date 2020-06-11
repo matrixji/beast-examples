@@ -1,0 +1,44 @@
+Checks: >-
+    -*,
+    clang-diagnostic-*,
+    -clang-diagnostic-gnu-zero-variadic-macro-arguments,
+    -clang-diagnostic-missing-braces,
+    -clang-diagnostic-mismatched-tags,
+    boost-*,
+    bugprone-*,
+    cert-*,
+    clang-analyzer-*,
+    google-*,
+    -google-build-using-namespace,
+    -google-readability-todo,
+    -google-readability-namespace-comments,
+    -google-runtime-references,
+    llvm-namespace-comment.SpaceBeforeComments,
+    llvm-namespace-comment.ShortNamespaceLines,
+    misc-*,
+    modernize-*,
+    -modernize-use-trailing-return-type,
+    performance-*,
+    cppcoreguidelines-*,
+    -cppcoreguidelines-pro-type-union-access,
+    -cppcoreguidelines-pro-bounds-array-to-pointer-decay
+AnalyzeTemporaryDtors: false
+CheckOptions:
+  - key: google-global-names-in-headers.HeaderFileExtensions
+    value: h,hh,hpp,hxx
+  - key: misc-definitions-in-headers.HeaderFileExtensions
+    value: h,hh,hpp,hxx
+  - key: misc-definitions-in-headers.UseHeaderFileExtension
+    value: '1'
+  - key: misc-suspicious-string-compare.WarnOnLogicalNotComparison
+    value: '1'
+  - key: modernize-use-auto.RemoveStars
+    value: '1'
+  - key: modernize-use-default-member-init.UseAssignment
+    value: '1'
+  - key: performance-inefficient-string-concatenation.StrictMode
+    value: '1'
+  - key: cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor
+    value: '1'
+  - key: cppcoreguidelines-special-member-functions.AllowMissingMoveFunctions
+    value: '0'
