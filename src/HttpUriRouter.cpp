@@ -16,5 +16,5 @@ HttpUriRouter::Handler HttpUriRouter::buildHandler(const std::string& pattern,
                                                    HttpUriRouter::HandlerFunction function)
 {
     std::regex regex{pattern, std::regex_constants::ECMAScript};
-    return {std::move(regex), std::move(function)};
+    return Handler{std::move(regex), std::move(function)};
 }

@@ -52,7 +52,8 @@ public:
 
                 void operator()() override
                 {
-                    auto exec = [session = self.shared_from_this(), this](auto error, auto) {
+                    auto session = self.shared_from_this();
+                    auto exec = [session, this](boost::system::error_code error, size_t) {
                         session->onWrite(error, msg.need_eof());
                     };
                     boost::beast::http::async_write(
@@ -64,7 +65,7 @@ public:
                 HttpSession& self;
             };
 
-            workers.emplace_back(std::make_unique<WorkerImpl>(self, std::move(msg)));
+            workers.emplace_back(boost::make_unique<WorkerImpl>(self, std::move(msg)));
 
             // If there was no previous work, start this one
             if(workers.size() == 1)

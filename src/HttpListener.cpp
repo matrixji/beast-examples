@@ -51,7 +51,8 @@ void HttpListener::run()
 }
 void HttpListener::doAccept()
 {
-    acceptor.async_accept(socket, [self = shared_from_this()](boost::system::error_code error) {
+    auto self = shared_from_this();
+    acceptor.async_accept(socket, [self](boost::system::error_code error) {
         self->onAccept(error);
     });
 }

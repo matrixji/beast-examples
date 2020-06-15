@@ -24,10 +24,10 @@ public:
     public:
         SamplingBlock(size_t id, SamplingMock& mock, int timeout, int snapsNeeded)
         : id{id}
-        , mock{mock}
+        , mock(mock)
         , timeout{timeout}
         , snapsNeeded{snapsNeeded}
-        , loop{[this] { run(); }}
+        , loop{&SamplingBlock::run, this}
         {
         }
         SamplingBlock(const SamplingBlock&) = delete;
@@ -151,7 +151,7 @@ public:
     size_t generateSnap()
     {
         std::unique_lock<std::mutex> lock(snapsMutex);
-        auto snap = std::make_unique<SnapBlock>(snapId);
+        auto snap = boost::make_unique<SnapBlock>(snapId);
         snaps.emplace(snapId++, std::move(snap));
         return snapId - 1;
     }
@@ -160,7 +160,7 @@ public:
     {
         std::unique_lock<std::mutex> lock(samplingMutex);
         auto sampleBlock =
-            std::make_unique<SamplingBlock>(samplingId, *this, timeout, snapsNeeded);
+            boost::make_unique<SamplingBlock>(samplingId, *this, timeout, snapsNeeded);
         samplings.emplace(samplingId++, std::move(sampleBlock));
         return samplingId - 1;
     }
@@ -175,7 +175,9 @@ public:
     {
         std::unique_lock<std::mutex> lock(samplingMutex);
         return std::any_of(samplings.begin(), samplings.end(),
-                           [](const auto& it) { return it.second->isRunning(); });
+                           [](const Samplings::value_type& it) {
+                               return it.second->isRunning();
+                           });
     }
 
     std::string getStatus(size_t sampleId, bool detail)
@@ -185,12 +187,14 @@ public:
     }
 
 private:
+    using Samplings = std::unordered_map<size_t, std::unique_ptr<SamplingBlock>>;
+    using Snaps = std::unordered_map<size_t, std::unique_ptr<SnapBlock>>;
     mutable std::mutex samplingMutex{};
     mutable std::mutex snapsMutex{};
     size_t samplingId{1};
     size_t snapId{1};
-    std::unordered_map<size_t, std::unique_ptr<SamplingBlock>> samplings{};
-    std::unordered_map<size_t, std::unique_ptr<SnapBlock>> snaps;
+    Samplings samplings{};
+    Snaps snaps;
 };
 
 class TrainingMock

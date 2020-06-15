@@ -10,7 +10,7 @@ HttpSession::HttpSession(boost::asio::ip::tcp::socket sock, HttpUriRouter& route
 , strand{socket.get_executor()}
 , timer{socket.get_executor().context(), std::chrono::steady_clock::time_point::max()}
 , queue{*this}
-, router{router}
+, router(router)
 {
 }
 
@@ -18,8 +18,9 @@ void HttpSession::run()
 {
     if(!strand.running_in_this_thread())
     {
-        return boost::asio::post(boost::asio::bind_executor(
-            strand, [self = shared_from_this()] { self->run(); }));
+        auto self = shared_from_this();
+        return boost::asio::post(
+            boost::asio::bind_executor(strand, [self] { self->run(); }));
     }
     onTimer({});
     doRead();
@@ -34,12 +35,12 @@ void HttpSession::doRead()
     request = {};
 
     // read a request
-    auto readCallback = [self = shared_from_this()](boost::system::error_code error,
-                                                    size_t readBytes) {
+    auto self = shared_from_this();
+    auto callback = [self](boost::system::error_code error, size_t readBytes) {
         self->onRead(error, readBytes);
     };
     boost::beast::http::async_read(socket, buffer, request,
-                                   boost::asio::bind_executor(strand, std::move(readCallback)));
+                                   boost::asio::bind_executor(strand, std::move(callback)));
 }
 
 void HttpSession::onTimer(boost::system::error_code error)
@@ -66,10 +67,9 @@ void HttpSession::onTimer(boost::system::error_code error)
     }
 
     // Wait on the timer
+    auto self = shared_from_this();
     timer.async_wait(boost::asio::bind_executor(
-        strand, [self = shared_from_this()](boost::system::error_code error) {
-            self->onTimer(error);
-        }));
+        strand, [self](boost::system::error_code error) { self->onTimer(error); }));
 }
 
 void HttpSession::onRead(boost::system::error_code error, size_t)
@@ -150,7 +150,7 @@ void HttpSession::doClose()
     socket.close(error);
 }
 
-HttpSession::Queue::Queue(HttpSession& session) : self{session}
+HttpSession::Queue::Queue(HttpSession& session) : self(session)
 {
     workers.reserve(limit);
 }
