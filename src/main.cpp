@@ -1,5 +1,6 @@
 #include "HttpListener.hpp"
 #include "JsonApiRequestHandler.hpp"
+#include "PicturePreviewHandler.hpp"
 #include "StaticRequestHandler.hpp"
 #include <boost/asio/signal_set.hpp>
 #include <boost/lexical_cast/try_lexical_convert.hpp>
@@ -81,7 +82,7 @@ public:
                 std::cout << timeout << " vs " << elapsed << std::endl;
                 std::cout << snapsNeeded << " vs " << snaps.size() << std::endl;
                 if((timeout > 0 and elapsed >= timeout) or
-                   (snapsNeeded > 0 and snaps.size() >= snapsNeeded))
+                   (snapsNeeded > 0 and static_cast<int>(snaps.size()) >= snapsNeeded))
                 {
                     running = false;
                 }
@@ -89,9 +90,9 @@ public:
                 {
                     std::this_thread::sleep_for(std::chrono::seconds{1});
                     ++elapsed;
-                    const auto snapId = mock.generateSnap();
+                    const auto newSnapId = mock.generateSnap();
                     std::unique_lock<std::mutex> lock(snapsMutex);
-                    snaps.emplace_back(snapId);
+                    snaps.emplace_back(newSnapId);
                     // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers)
                     while(snaps.size() > 30)
                     {
@@ -101,10 +102,9 @@ public:
             }
         }
 
-        std::string getStatus(bool detail)
+        nlohmann::json getStatus(bool detail)
         {
             nlohmann::json json = {
-                {"ret", 0},
                 {"id", id},
             };
             if(running)
@@ -121,7 +121,7 @@ public:
                 std::unique_lock<std::mutex> lock(snapsMutex);
                 json.emplace("snaps", snaps);
             }
-            return std::move(json.dump());
+            return json;
         }
 
     private:
@@ -180,10 +180,10 @@ public:
                            });
     }
 
-    std::string getStatus(size_t sampleId, bool detail)
+    nlohmann::json getStatus(size_t sampleId, bool detail)
     {
         std::unique_lock<std::mutex> lock(samplingMutex);
-        return std::move(samplings.at(sampleId)->getStatus(detail));
+        return samplings.at(sampleId)->getStatus(detail);
     }
 
 private:
@@ -212,8 +212,8 @@ SamplingMock samplingMock;
 void installPoc(HttpListener& server)
 {
     // POST /api/v1/calibration/sampling/start
-    auto samplingStartHandler =
-        std::make_shared<JsonApiRequestHandler>([](HttpSession::Request& req) -> std::string {
+    auto samplingStartHandler = std::make_shared<JsonApiRequestHandler>(
+        [](HttpSession::Request& req) -> nlohmann::json {
             auto& body = req.body();
             // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers)
             int timeout{60};
@@ -257,8 +257,8 @@ void installPoc(HttpListener& server)
     server.registHandler("^/api/v1/calibration/sampling/start$", samplingStartHandler);
 
     // GET /api/v1/calibration/sampling/\d+
-    auto samplingStatusHandler =
-        std::make_shared<JsonApiRequestHandler>([](HttpSession::Request& req) -> std::string {
+    auto samplingStatusHandler = std::make_shared<JsonApiRequestHandler>(
+        [](HttpSession::Request& req) -> nlohmann::json {
             std::string target = req.target().to_string();
             auto pos = target.find('/');
             auto idStr = target.substr(pos + 1);
@@ -280,13 +280,14 @@ void installPoc(HttpListener& server)
     server.registHandler("^/api/v1/calibration/sampling/\\d+$", samplingStatusHandler);
 
     // POST /api/v1/calibration/sampling/stop
-    auto samplingStopHandler =
-        std::make_shared<JsonApiRequestHandler>([](HttpSession::Request& req) -> std::string {
+    auto samplingStopHandler = std::make_shared<JsonApiRequestHandler>(
+        [](HttpSession::Request& req) -> nlohmann::json {
             try
             {
                 auto json = nlohmann::json::parse(req.body());
                 size_t id = json.at("id");
                 samplingMock.stop(id);
+                return nlohmann::json{};
             }
             catch(const nlohmann::json::parse_error& ex)
             {
@@ -300,12 +301,57 @@ void installPoc(HttpListener& server)
             {
                 throw JsonApiRequestHandler::NotFound("id may not exist");
             }
-            return nlohmann::json{{"ret", 0}}.dump();
         });
     server.registHandler("^/api/v1/calibration/sampling/stop$", samplingStopHandler);
 
+    // POST /api/v1/realtime/preview/pictures
+    auto picHandler = std::make_shared<PicturePreviewHandler>(30);
+    auto picPostHandler = std::make_shared<JsonApiRequestHandler>(
+        [picHandler](HttpSession::Request& req) -> nlohmann::json {
+            const auto& body = req.body();
+            auto getSize = [&body](size_t off) -> uint32_t {
+                uint32_t ret = 0;
+                for (size_t index=off; index<off+4; ++index)
+                {
+                    ret <<= 8;
+                    ret += static_cast<uint32_t>(static_cast<uint8_t>(body.at(index)));
+                }
+                return ret;
+            };
+            size_t proceed = 0;
+            size_t total = body.size();
+            std::vector<PicturePreviewHandler::PictureView> pvs;
+            while (proceed < total)
+            {
+                auto nextBytes = getSize(proceed);
+                proceed += 4;
+                const char *pos = body.data();
+                std::advance(pos, proceed);
+                pvs.emplace_back(std::string{pos, nextBytes});
+                proceed += nextBytes;
+            }
+            picHandler->createPreview(std::move(pvs));
+            return nlohmann::json{};
+        });
+    server.registHandler("^/api/v1/realtime/preview/pictures$", picPostHandler);
+
+    auto picListHandler = std::make_shared<JsonApiRequestHandler>(
+        [picHandler](HttpSession::Request& req) -> nlohmann::json {
+            auto target = req.target().to_string();
+            const std::string lookup = "?prev=";
+            auto pos = target.rfind(lookup);
+            std::string prev{""};
+            if (pos == boost::beast::string_view::npos)
+            {
+                prev = target.substr(pos + lookup.length());
+            }
+            return picHandler->listPreview(prev, 10);
+        }
+    );
+    server.registHandler("^/api/v1/realtime/preview(\\?prev=.+)?/", picListHandler);
+    
+
     // TODO: GET /api/v1/realtime/preview/picture/<uuid>/[0-4]
-    // TODO: GET /api/v1/realtime/preview?prev=<uuid>
 }
 } // namespace
 // end poc
@@ -359,7 +405,7 @@ int main(int argc, const char* argv[])
 
         server->run();
 
-        boost::asio::signal_set signals(ioContext, SIGINT, SIGTERM);
+        asio::signal_set signals(ioContext, SIGINT, SIGTERM);
         signals.async_wait([&](boost::system::error_code const&, int) {
             // Stop the `io_context`. This will cause `run()`
             // to return immediately, eventually destroying the

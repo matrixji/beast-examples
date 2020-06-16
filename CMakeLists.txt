@@ -34,3 +34,6 @@ if(COMPILER_SUPPORTS_CXX11)
 else()
     message(FATAL_ERROR "${CMAKE_CXX_COMPILER} has no c++11 support.")
 endif()
+
+# extra flags
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")

@@ -5,9 +5,10 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/strand.hpp>
 #include <boost/beast/core/flat_buffer.hpp>
-#include <boost/beast/http.hpp>
 #include <boost/beast/http/message.hpp>
 #include <boost/beast/http/string_body.hpp>
+#include <boost/beast/http/write.hpp>
+#include <boost/make_unique.hpp>
 #include <memory>
 #include <vector>
 
@@ -15,6 +16,9 @@ class HttpUriRouter;
 
 class HttpSession : public std::enable_shared_from_this<HttpSession>
 {
+    using tcp = boost::asio::ip::tcp;
+    using error_code = boost::system::error_code;
+
 public:
     class Queue
     {
@@ -46,14 +50,14 @@ public:
             public:
                 WorkerImpl(HttpSession& session,
                            boost::beast::http::message<isRequest, Body, Fields>&& msg)
-                : self(session), msg(std::move(msg))
+                : msg(std::move(msg)), self(session)
                 {
                 }
 
                 void operator()() override
                 {
                     auto session = self.shared_from_this();
-                    auto exec = [session, this](boost::system::error_code error, size_t) {
+                    auto exec = [session, this](error_code error, size_t) {
                         session->onWrite(error, msg.need_eof());
                     };
                     boost::beast::http::async_write(
@@ -84,22 +88,22 @@ public:
 
     using Request = boost::beast::http::request<boost::beast::http::string_body>;
 
-    HttpSession(boost::asio::ip::tcp::socket, HttpUriRouter&);
+    HttpSession(tcp::socket, HttpUriRouter&);
 
     void run();
 
     void doRead();
 
-    void onTimer(boost::system::error_code);
+    void onTimer(error_code);
 
-    void onRead(boost::system::error_code, size_t);
+    void onRead(error_code, size_t);
 
-    void onWrite(boost::system::error_code, bool);
+    void onWrite(error_code, bool);
 
     void doClose();
 
 private:
-    boost::asio::ip::tcp::socket socket;
+    tcp::socket socket;
     boost::asio::strand<boost::asio::io_context::executor_type> strand;
     boost::asio::steady_timer timer;
     boost::beast::flat_buffer buffer;

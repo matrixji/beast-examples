@@ -5,7 +5,7 @@
 #include <boost/beast.hpp>
 #include <utility>
 
-HttpSession::HttpSession(boost::asio::ip::tcp::socket sock, HttpUriRouter& router)
+HttpSession::HttpSession(tcp::socket sock, HttpUriRouter& router)
 : socket{std::move(sock)}
 , strand{socket.get_executor()}
 , timer{socket.get_executor().context(), std::chrono::steady_clock::time_point::max()}
@@ -36,14 +36,14 @@ void HttpSession::doRead()
 
     // read a request
     auto self = shared_from_this();
-    auto callback = [self](boost::system::error_code error, size_t readBytes) {
+    auto callback = [self](error_code error, size_t readBytes) {
         self->onRead(error, readBytes);
     };
     boost::beast::http::async_read(socket, buffer, request,
-                                   boost::asio::bind_executor(strand, std::move(callback)));
+                                   bind_executor(strand, std::move(callback)));
 }
 
-void HttpSession::onTimer(boost::system::error_code error)
+void HttpSession::onTimer(error_code error)
 {
     if(error and error != boost::asio::error::operation_aborted)
     {
@@ -60,19 +60,19 @@ void HttpSession::onTimer(boost::system::error_code error)
     if(timer.expiry() <= std::chrono::steady_clock::now())
     {
         // Closing the socket cancels all outstanding operations. They
-        // will complete with boost::asio::error::operation_aborted
-        socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, error);
+        // will complete with asio::error::operation_aborted
+        socket.shutdown(tcp::socket::shutdown_both, error);
         socket.close(error);
         return;
     }
 
     // Wait on the timer
     auto self = shared_from_this();
-    timer.async_wait(boost::asio::bind_executor(
-        strand, [self](boost::system::error_code error) { self->onTimer(error); }));
+    timer.async_wait(
+        bind_executor(strand, [self](error_code error) { self->onTimer(error); }));
 }
 
-void HttpSession::onRead(boost::system::error_code error, size_t)
+void HttpSession::onRead(error_code error, size_t)
 {
     // Happens when the timer closes the socket
     if(error == boost::asio::error::operation_aborted)
@@ -117,7 +117,7 @@ void HttpSession::onRead(boost::system::error_code error, size_t)
     }
 }
 
-void HttpSession::onWrite(boost::system::error_code error, bool close)
+void HttpSession::onWrite(error_code error, bool close)
 {
     // Happens when the timer closes the socket
     if(error == boost::asio::error::operation_aborted)
@@ -145,8 +145,8 @@ void HttpSession::onWrite(boost::system::error_code error, bool close)
 
 void HttpSession::doClose()
 {
-    boost::system::error_code error;
-    socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, error);
+    error_code error;
+    socket.shutdown(tcp::socket::shutdown_both, error);
     socket.close(error);
 }
 

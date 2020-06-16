@@ -2,15 +2,13 @@
 #include "HttpSession.hpp"
 #include "Utils.hpp"
 #include <boost/asio/dispatch.hpp>
-#include <boost/beast/core.hpp>
 
-HttpListener::HttpListener(boost::asio::io_context& ioContext,
-                           const boost::asio::ip::tcp::endpoint& endpoint,
+HttpListener::HttpListener(io_context& ioContext, const tcp::endpoint& endpoint,
                            std::shared_ptr<const std::string> documentRoot)
 : socket{ioContext}, acceptor{ioContext}, documentRoot{std::move(documentRoot)}
 {
     using boost::asio::socket_base;
-    boost::system::error_code error;
+    error_code error;
 
     acceptor.open(endpoint.protocol(), error);
     if(error)
@@ -52,12 +50,11 @@ void HttpListener::run()
 void HttpListener::doAccept()
 {
     auto self = shared_from_this();
-    acceptor.async_accept(socket, [self](boost::system::error_code error) {
-        self->onAccept(error);
-    });
+    acceptor.async_accept(socket,
+                          [self](error_code error) { self->onAccept(error); });
 }
 
-void HttpListener::onAccept(boost::system::error_code error)
+void HttpListener::onAccept(error_code error)
 {
     if(error)
     {
