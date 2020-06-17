@@ -23,9 +23,11 @@ public:
         PictureView() = delete;
         PictureView(const PictureView&) = delete;
         PictureView& operator=(const PictureView&) = delete;
-        PictureView(PictureView&&);
+        PictureView(PictureView&&) noexcept;
+        PictureView& operator=(PictureView&&) noexcept;
+        ~PictureView() = default;
 
-        std::string getData() const;
+        const std::string& getData() const;
 
     private:
         std::string data;
@@ -40,7 +42,7 @@ public:
 
         time_t timestamp() const;
 
-        std::shared_ptr<PictureView> picture(size_t);
+        std::shared_ptr<PictureView> picture(size_t) const;
 
     private:
         std::string uuid_;

@@ -79,8 +79,6 @@ public:
             elapsed = 0;
             while(running)
             {
-                std::cout << timeout << " vs " << elapsed << std::endl;
-                std::cout << snapsNeeded << " vs " << snaps.size() << std::endl;
                 if((timeout > 0 and elapsed >= timeout) or
                    (snapsNeeded > 0 and static_cast<int>(snaps.size()) >= snapsNeeded))
                 {
@@ -145,6 +143,7 @@ public:
         }
 
     private:
+        // NOLINTNEXTLINE(clang-diagnostic-unused-private-field)
         size_t id;
     };
 
@@ -304,16 +303,22 @@ void installPoc(HttpListener& server)
         });
     server.registHandler("^/api/v1/calibration/sampling/stop$", samplingStopHandler);
 
+    constexpr auto picPreviewCacheNum{30};
+    auto picHandler = std::make_shared<PicturePreviewHandler>(picPreviewCacheNum);
+
+    // GET /api/v1/realtime/preview/picture/<uuid>/[0-4]
+    server.registHandler("^/api/v1/realtime/preview/[a-f0-9-]+/[0-9]$", picHandler);
+
     // POST /api/v1/realtime/preview/pictures
-    auto picHandler = std::make_shared<PicturePreviewHandler>(30);
     auto picPostHandler = std::make_shared<JsonApiRequestHandler>(
         [picHandler](HttpSession::Request& req) -> nlohmann::json {
             const auto& body = req.body();
             auto getSize = [&body](size_t off) -> uint32_t {
                 uint32_t ret = 0;
-                for(size_t index = off; index < off + 4; ++index)
+                for(size_t index = off; index < off + sizeof(uint32_t); ++index)
                 {
-                    ret <<= 8;
+                    constexpr uint32_t bits{8};
+                    ret <<= bits;
                     ret += static_cast<uint32_t>(static_cast<uint8_t>(body.at(index)));
                 }
                 return ret;
@@ -321,17 +326,18 @@ void installPoc(HttpListener& server)
             size_t proceed = 0;
             size_t total = body.size();
             std::vector<PicturePreviewHandler::PictureView> pvs;
+            std::cout << total << std::endl;
             while(proceed < total)
             {
                 auto nextBytes = getSize(proceed);
-                proceed += 4;
+                proceed += sizeof(decltype(nextBytes));
                 const char* pos = body.data();
                 std::advance(pos, proceed);
-                pvs.emplace_back(std::string{pos, nextBytes});
+                std::string data(pos, nextBytes);
+                pvs.emplace_back(data);
                 proceed += nextBytes;
             }
-            picHandler->createPreview(std::move(pvs));
-            return nlohmann::json{};
+            return picHandler->createPreview(std::move(pvs));
         });
     server.registHandler("^/api/v1/realtime/preview/pictures$", picPostHandler);
 
@@ -345,12 +351,10 @@ void installPoc(HttpListener& server)
             {
                 prev = target.substr(pos + lookup.length());
             }
-            return picHandler->listPreview(prev, 10);
+            constexpr size_t returnLimit{10};
+            return picHandler->listPreview(prev, returnLimit);
         });
     server.registHandler("^/api/v1/realtime/preview(\\?prev=.+)?$", picListHandler);
-
-    // GET /api/v1/realtime/preview/picture/<uuid>/[0-4]
-    server.registHandler("^/api/v1/realtime/preview/[a-f0-9]+/[0-9]$", picHandler);
 }
 } // namespace
 // end poc

@@ -30,7 +30,7 @@ inline time_t PicturePreviewHandler::Pictures::timestamp() const
 }
 
 std::shared_ptr<PicturePreviewHandler::PictureView>
-PicturePreviewHandler::Pictures::picture(size_t index)
+PicturePreviewHandler::Pictures::picture(size_t index) const
 {
     try
     {
@@ -47,14 +47,24 @@ PicturePreviewHandler::PictureView::PictureView(std::string data)
 {
 }
 
-PicturePreviewHandler::PictureView::PictureView(PicturePreviewHandler::PictureView&& pv)
+PicturePreviewHandler::PictureView::PictureView(PicturePreviewHandler::PictureView&& pv) noexcept
 : data{std::move(pv.data)}
 {
 }
 
-std::string PicturePreviewHandler::PictureView::getData() const
+PicturePreviewHandler::PictureView&
+PicturePreviewHandler::PictureView::operator=(PicturePreviewHandler::PictureView&& pv) noexcept
 {
-    return std::move(data);
+    if(this != &pv)
+    {
+        data.swap(pv.data);
+    }
+    return *this;
+}
+
+const std::string& PicturePreviewHandler::PictureView::getData() const
+{
+    return data;
 }
 
 PicturePreviewHandler::PicturePreviewHandler(size_t cacheLimit)
@@ -66,7 +76,7 @@ nlohmann::json PicturePreviewHandler::createPreview(std::vector<PictureView>&& p
 {
     boost::uuids::uuid uuid = boost::uuids::random_generator()();
     time_t now = std::time(nullptr);
-    const auto uuidStr = boost::uuids::to_string(uuid);
+    auto uuidStr = boost::uuids::to_string(uuid);
 
     // with lock
     {
@@ -84,27 +94,42 @@ nlohmann::json PicturePreviewHandler::createPreview(std::vector<PictureView>&& p
 
 void to_json(nlohmann::json& json, const PicturePreviewHandler::Pictures& pvs)
 {
-    json = nlohmann::json{{"uuid", pvs.uuid()}, {"timestamp", pvs.timestamp()}};
+    auto getMask = [&pvs]() -> int {
+        int mask = 0;
+        int currMask = 1;
+        constexpr unsigned int numOfPics{5};
+        for(size_t i = 0; i < numOfPics; i++)
+        {
+            auto pic = pvs.picture(i);
+            if(pic->getData().size() > 0)
+            {
+                mask |= currMask;
+            }
+            currMask <<= 1;
+        }
+        return mask;
+    };
+    json = nlohmann::json{
+        {"uuid", pvs.uuid()}, {"timestamp", pvs.timestamp()}, {"mask", getMask()}};
 }
 
 nlohmann::json PicturePreviewHandler::listPreview(const std::string& prev, size_t limit)
 {
-    nlohmann::json json{{"pictures", std::vector<Pictures>{}}};
-    auto pics_josn = json.at("pictures");
+    std::vector<Pictures> pics{};
     {
         std::unique_lock<std::mutex> lock(mutex);
         size_t n = 0;
-        for(const auto uuidStr : ids)
+        for(const auto& uuidStr : ids)
         {
             if(uuidStr == prev or (limit > 0 and n >= limit))
             {
                 break;
             }
-            pics_josn.emplace_back(pictures.at(uuidStr));
+            pics.emplace_back(pictures.at(uuidStr));
             ++n;
         }
     }
-    return json;
+    return nlohmann::json{{"pictures", pics}};
 }
 
 PicturePreviewHandler::Response PicturePreviewHandler::visitPreview(const HttpSession::Request& req)
@@ -126,7 +151,7 @@ PicturePreviewHandler::Response PicturePreviewHandler::visitPreview(const HttpSe
         auto picture = getPicture(uuid, index);
         Response res{utils::HttpStatus::ok, req.version()};
         res.set(utils::HttpField::server, BOOST_BEAST_VERSION_STRING);
-        res.set(utils::HttpField::content_type, "application/json");
+        res.set(utils::HttpField::content_type, "image/jpeg");
         res.keep_alive(req.keep_alive());
         res.body() = picture->getData();
         res.prepare_payload();
@@ -143,14 +168,14 @@ void PicturePreviewHandler::handleRequest(HttpSession::Request&& req, HttpSessio
     using HttpVerb = boost::beast::http::verb;
     if(req.method() != HttpVerb::get)
     {
-        return send(std::move(utils::createJsonBadRequest(req, "Unsupported method.")));
+        return send(utils::createJsonBadRequest(req, "Unsupported method."));
     }
     try
     {
-        return send(std::move(visitPreview(req)));
+        return send(visitPreview(req));
     }
     catch(const std::exception& ex)
     {
-        return send(std::move(utils::createJsonServerError(req, ex.what())));
+        return send(utils::createJsonServerError(req, ex.what()));
     }
 }

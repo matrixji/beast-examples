@@ -1,10 +1,10 @@
 #ifndef HTTP_CLIENT_HPP
 #define HTTP_CLIENT_HPP
 
+#include <boost/asio/ip/tcp.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
-#include <boost/asio/ip/tcp.hpp>
 #include <string>
 
 class HttpClient
@@ -12,7 +12,7 @@ class HttpClient
 public:
     HttpClient(std::string, uint16_t, std::string);
 
-    void post(const std::string&, std::string&);
+    void post(const std::string&, std::string&&);
 
 private:
     std::string host;

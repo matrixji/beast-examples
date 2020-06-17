@@ -8,6 +8,7 @@ Checks: >-
     bugprone-*,
     cert-*,
     clang-analyzer-*,
+    -clang-analyzer-cplusplus.NewDeleteLeaks,
     google-*,
     -google-build-using-namespace,
     -google-readability-todo,

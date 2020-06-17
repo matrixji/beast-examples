@@ -4,7 +4,12 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(beast_examples)
 
-add_library(democlient src/HttpClient.cpp)
+add_library(democlient
+        src/HttpClient.cpp
+        src/democlient.cpp)
+
+add_executable(testclient src/testclient.c)
+target_link_libraries(testclient democlient pthread)
 
 add_executable(beast_server
         src/main.cpp
@@ -33,6 +38,7 @@ include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
 if(COMPILER_SUPPORTS_CXX11)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c11")
 else()
     message(FATAL_ERROR "${CMAKE_CXX_COMPILER} has no c++11 support.")
 endif()
