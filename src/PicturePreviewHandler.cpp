@@ -96,7 +96,7 @@ nlohmann::json PicturePreviewHandler::listPreview(const std::string& prev, size_
         size_t n = 0;
         for(const auto uuidStr : ids)
         {
-            if (uuidStr == prev or (limit > 0 and n >= limit))
+            if(uuidStr == prev or (limit > 0 and n >= limit))
             {
                 break;
             }
@@ -135,5 +135,22 @@ PicturePreviewHandler::Response PicturePreviewHandler::visitPreview(const HttpSe
     catch(std::out_of_range&)
     {
         return utils::createJsonNotFound(req, uri);
+    }
+}
+
+void PicturePreviewHandler::handleRequest(HttpSession::Request&& req, HttpSession::Queue& send)
+{
+    using HttpVerb = boost::beast::http::verb;
+    if(req.method() != HttpVerb::get)
+    {
+        return send(std::move(utils::createJsonBadRequest(req, "Unsupported method.")));
+    }
+    try
+    {
+        return send(std::move(visitPreview(req)));
+    }
+    catch(const std::exception& ex)
+    {
+        return send(std::move(utils::createJsonServerError(req, ex.what())));
     }
 }

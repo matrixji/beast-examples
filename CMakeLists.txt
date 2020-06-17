@@ -2,9 +2,11 @@ cmake_minimum_required(VERSION 3.12)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-project(beast_test)
+project(beast_examples)
 
-add_executable(beast_test
+add_library(democlient src/HttpClient.cpp)
+
+add_executable(beast_server
         src/main.cpp
         src/HttpListener.cpp
         src/HttpSession.cpp
@@ -15,8 +17,8 @@ add_executable(beast_test
         src/HttpUriRouter.cpp
         src/PicturePreviewHandler.cpp)
 
-target_include_directories(beast_test PRIVATE third-part/include)
-target_link_libraries(beast_test PUBLIC pthread)
+target_include_directories(beast_server PRIVATE third-part/include)
+target_link_libraries(beast_server PUBLIC pthread)
 
 find_package(Boost COMPONENTS REQUIRED)
 if(Boost_FOUND)

@@ -26,6 +26,7 @@ public:
         PictureView(PictureView&&);
 
         std::string getData() const;
+
     private:
         std::string data;
     };
@@ -56,6 +57,8 @@ public:
     nlohmann::json listPreview(const std::string&, size_t);
 
     Response visitPreview(const HttpSession::Request&);
+
+    void handleRequest(HttpSession::Request&&, HttpSession::Queue&);
 
 private:
     using PictureIds = std::list<std::string>;

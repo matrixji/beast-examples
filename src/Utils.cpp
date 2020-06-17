@@ -21,7 +21,8 @@ bool utils::isDirectory(const char* path)
     return (::stat(path, &buffer) == 0) and S_ISDIR(buffer.st_mode);
 }
 
-utils::Response utils::createJsonOkRequest(const HttpSession::Request& req, nlohmann::json&& json)
+utils::Response utils::createJsonOkRequest(const HttpSession::Request& req,
+                                           nlohmann::json&& json)
 {
     json.emplace("ret", 0);
     Response res{HttpStatus::ok, req.version()};
@@ -33,7 +34,8 @@ utils::Response utils::createJsonOkRequest(const HttpSession::Request& req, nloh
     return res;
 }
 
-utils::Response utils::createJsonBadRequest(const HttpSession::Request& req, utils::string_view why)
+utils::Response utils::createJsonBadRequest(const HttpSession::Request& req,
+                                            utils::string_view why)
 {
     nlohmann::json json = {
         {"ret", 1},
@@ -65,7 +67,8 @@ utils::Response utils::createJsonNotFound(const HttpSession::Request& req, utils
     return res;
 }
 
-utils::Response utils::createJsonServerError(const HttpSession::Request& req, utils::string_view what)
+utils::Response utils::createJsonServerError(const HttpSession::Request& req,
+                                             utils::string_view what)
 {
     nlohmann::json json = {
         {"ret", 1},

@@ -311,7 +311,7 @@ void installPoc(HttpListener& server)
             const auto& body = req.body();
             auto getSize = [&body](size_t off) -> uint32_t {
                 uint32_t ret = 0;
-                for (size_t index=off; index<off+4; ++index)
+                for(size_t index = off; index < off + 4; ++index)
                 {
                     ret <<= 8;
                     ret += static_cast<uint32_t>(static_cast<uint8_t>(body.at(index)));
@@ -321,11 +321,11 @@ void installPoc(HttpListener& server)
             size_t proceed = 0;
             size_t total = body.size();
             std::vector<PicturePreviewHandler::PictureView> pvs;
-            while (proceed < total)
+            while(proceed < total)
             {
                 auto nextBytes = getSize(proceed);
                 proceed += 4;
-                const char *pos = body.data();
+                const char* pos = body.data();
                 std::advance(pos, proceed);
                 pvs.emplace_back(std::string{pos, nextBytes});
                 proceed += nextBytes;
@@ -341,17 +341,16 @@ void installPoc(HttpListener& server)
             const std::string lookup = "?prev=";
             auto pos = target.rfind(lookup);
             std::string prev{""};
-            if (pos == boost::beast::string_view::npos)
+            if(pos == boost::beast::string_view::npos)
             {
                 prev = target.substr(pos + lookup.length());
             }
             return picHandler->listPreview(prev, 10);
-        }
-    );
-    server.registHandler("^/api/v1/realtime/preview(\\?prev=.+)?/", picListHandler);
-    
+        });
+    server.registHandler("^/api/v1/realtime/preview(\\?prev=.+)?$", picListHandler);
 
-    // TODO: GET /api/v1/realtime/preview/picture/<uuid>/[0-4]
+    // GET /api/v1/realtime/preview/picture/<uuid>/[0-4]
+    server.registHandler("^/api/v1/realtime/preview/[a-f0-9]+/[0-9]$", picHandler);
 }
 } // namespace
 // end poc
