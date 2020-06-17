@@ -307,7 +307,7 @@ void installPoc(HttpListener& server)
     auto picHandler = std::make_shared<PicturePreviewHandler>(picPreviewCacheNum);
 
     // GET /api/v1/realtime/preview/picture/<uuid>/[0-4]
-    server.registHandler("^/api/v1/realtime/preview/[a-f0-9-]+/[0-9]$", picHandler);
+    server.registHandler("^/api/v1/realtime/preview/picture/[a-f0-9-]+/[0-9]$", picHandler);
 
     // POST /api/v1/realtime/preview/pictures
     auto picPostHandler = std::make_shared<JsonApiRequestHandler>(
@@ -347,7 +347,7 @@ void installPoc(HttpListener& server)
             const std::string lookup = "?prev=";
             auto pos = target.rfind(lookup);
             std::string prev{""};
-            if(pos == boost::beast::string_view::npos)
+            if(pos != boost::beast::string_view::npos)
             {
                 prev = target.substr(pos + lookup.length());
             }
