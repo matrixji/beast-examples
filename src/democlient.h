@@ -6,7 +6,7 @@ extern "C"
 {
 #endif
 
-    // post structure for picture.
+    // post structure for snap.
     // NOLINTNEXTLINE(modernize-use-using)
     typedef struct PostPicture
     {
@@ -23,13 +23,16 @@ extern "C"
         char* data;
     } PostPicture;
 
-    // post picture to server
+    // post snap to server
     // arguments:
-    //  pictures: start address of PostPicture[]
-    //  length: length of PostPicture[], must be 5
+    //  snaps: start address of PostPicture[]
+    //  numOfSnaps: length of snaps, must be 5
+    //  tracks: start address of PostPicture[]
+    //  numOfTracks: length of tracks
     //
     // return: 0 for success, others for error.
-    int postPictures(const PostPicture* pictures, unsigned int length);
+    int postPictures(const PostPicture* snaps, unsigned int numOfSnaps,
+                     const PostPicture* tracks, unsigned int numOfTracks);
 
 #ifdef __cplusplus
 };

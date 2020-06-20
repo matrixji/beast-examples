@@ -6,6 +6,7 @@
 #include <boost/asio/strand.hpp>
 #include <boost/beast/core/flat_buffer.hpp>
 #include <boost/beast/http/message.hpp>
+#include <boost/beast/http/parser.hpp>
 #include <boost/beast/http/string_body.hpp>
 #include <boost/beast/http/write.hpp>
 #include <boost/make_unique.hpp>
@@ -16,9 +17,6 @@ class HttpUriRouter;
 
 class HttpSession : public std::enable_shared_from_this<HttpSession>
 {
-    using tcp = boost::asio::ip::tcp;
-    using error_code = boost::system::error_code;
-
 public:
     class Queue
     {
@@ -57,7 +55,7 @@ public:
                 void operator()() override
                 {
                     auto session = self.shared_from_this();
-                    auto exec = [session, this](error_code error, size_t) {
+                    auto exec = [session, this](boost::system::error_code error, size_t) {
                         session->onWrite(error, msg.need_eof());
                     };
                     boost::beast::http::async_write(
@@ -86,30 +84,32 @@ public:
         std::vector<std::unique_ptr<Worker>> workers;
     };
 
-    using Request = boost::beast::http::request<boost::beast::http::string_body>;
-
-    HttpSession(tcp::socket, HttpUriRouter&);
+    HttpSession(boost::asio::ip::tcp::socket, HttpUriRouter&);
 
     void run();
 
     void doRead();
 
-    void onTimer(error_code);
+    void onTimer(boost::system::error_code);
 
-    void onRead(error_code, size_t);
+    void onRead(boost::system::error_code, size_t);
 
-    void onWrite(error_code, bool);
+    void onWrite(boost::system::error_code, bool);
 
     void doClose();
 
 private:
-    tcp::socket socket;
+    using RequestParser =
+        boost::beast::http::request_parser<boost::beast::http::string_body>;
+
+    const size_t bodyLimit{32 * 1024 * 1024};
+    boost::asio::ip::tcp::socket socket;
     boost::asio::strand<boost::asio::io_context::executor_type> strand;
     boost::asio::steady_timer timer;
     boost::beast::flat_buffer buffer;
-    Request request;
     Queue queue;
     HttpUriRouter& router;
+    boost::optional<RequestParser> parser;
 };
 
 #endif // HTTP_SESSION_HPP

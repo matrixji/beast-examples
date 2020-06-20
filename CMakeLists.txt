@@ -6,21 +6,26 @@ project(beast_examples)
 
 add_library(democlient
         src/HttpClient.cpp
-        src/democlient.cpp)
+        src/democlient.cpp
+        src/Utils.cpp)
+target_include_directories(democlient PRIVATE third-part/include)
+
 
 add_executable(testclient src/testclient.c)
 target_link_libraries(testclient democlient pthread)
+
 
 add_executable(beast_server
         src/main.cpp
         src/HttpListener.cpp
         src/HttpSession.cpp
-        src/WebSocketSession.cpp
+        src/WebsocketSession.cpp
         src/StaticRequestHandler.cpp
         src/Utils.cpp
         src/JsonApiRequestHandler.cpp
         src/HttpUriRouter.cpp
-        src/PicturePreviewHandler.cpp)
+        src/PicturePreviewHandler.cpp
+        src/WebsocketHandler.cpp)
 
 target_include_directories(beast_server PRIVATE third-part/include)
 target_link_libraries(beast_server PUBLIC pthread)

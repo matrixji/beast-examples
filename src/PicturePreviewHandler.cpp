@@ -1,9 +1,6 @@
-
 #include "PicturePreviewHandler.hpp"
 #include "Utils.hpp"
 #include <boost/algorithm/string.hpp>
-#include <boost/beast/http/file_body.hpp>
-#include <boost/beast/version.hpp>
 #include <boost/lexical_cast/try_lexical_convert.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -13,9 +10,18 @@ PicturePreviewHandler::Pictures::Pictures(std::string uuid, time_t timestamp,
                                           std::vector<PictureView>&& pvs)
 : uuid_{std::move(uuid)}, timestamp_{timestamp}
 {
+    size_t index = 0;
     for(auto& pv : pvs)
     {
-        pictures.emplace_back(std::make_shared<PictureView>(std::move(pv)));
+        if(index < snapsLen)
+        {
+            snaps.emplace_back(std::make_shared<PictureView>(std::move(pv)));
+        }
+        else
+        {
+            tracks.emplace_back(std::make_shared<PictureView>(std::move(pv)));
+        }
+        ++index;
     }
 }
 
@@ -30,16 +36,73 @@ inline time_t PicturePreviewHandler::Pictures::timestamp() const
 }
 
 std::shared_ptr<PicturePreviewHandler::PictureView>
-PicturePreviewHandler::Pictures::picture(size_t index) const
+PicturePreviewHandler::Pictures::snap(size_t index) const
 {
     try
     {
-        return pictures.at(index);
+        return snaps.at(index);
     }
     catch(std::out_of_range&)
     {
         return std::make_shared<PictureView>(std::string{});
     }
+}
+
+std::shared_ptr<PicturePreviewHandler::PictureView>
+PicturePreviewHandler::Pictures::track(size_t index) const
+{
+    try
+    {
+        return tracks.at(index);
+    }
+    catch(std::out_of_range&)
+    {
+        return std::make_shared<PictureView>(std::string{});
+    }
+}
+size_t PicturePreviewHandler::Pictures::numOfTracks() const
+{
+    return tracks.size();
+}
+
+int PicturePreviewHandler::Pictures::getSnapMask() const
+{
+    int mask = 0;
+    int currMask = 1;
+    constexpr unsigned int numOfPics{5};
+    for(size_t i = 0; i < numOfPics; i++)
+    {
+        auto pic = snap(i);
+        if(pic->getData().size() > 0)
+        {
+            mask |= currMask;
+        }
+        currMask <<= 1;
+    }
+    return mask;
+}
+std::vector<std::string> PicturePreviewHandler::Pictures::getTrackUrls() const
+{
+    std::vector<std::string> ret;
+    for(size_t i = 0; i < tracks.size(); ++i)
+    {
+        ret.emplace_back(std::string("/api/v1/realtime/preview/picture/") +
+                         uuid_ + "/tracks/" + std::to_string(i));
+    }
+    return ret;
+}
+std::vector<std::string> PicturePreviewHandler::Pictures::getSnapUrls() const
+{
+    std::vector<std::string> ret;
+    for(size_t i = 0; i < snaps.size(); ++i)
+    {
+        if(snaps.at(i)->getData().size() > 0)
+        {
+            ret.emplace_back(std::string("/api/v1/realtime/preview/picture/") +
+                             uuid_ + "/snaps/" + std::to_string(i));
+        }
+    }
+    return ret;
 }
 
 PicturePreviewHandler::PictureView::PictureView(std::string data)
@@ -94,23 +157,11 @@ nlohmann::json PicturePreviewHandler::createPreview(std::vector<PictureView>&& p
 
 void to_json(nlohmann::json& json, const PicturePreviewHandler::Pictures& pvs)
 {
-    auto getMask = [&pvs]() -> int {
-        int mask = 0;
-        int currMask = 1;
-        constexpr unsigned int numOfPics{5};
-        for(size_t i = 0; i < numOfPics; i++)
-        {
-            auto pic = pvs.picture(i);
-            if(pic->getData().size() > 0)
-            {
-                mask |= currMask;
-            }
-            currMask <<= 1;
-        }
-        return mask;
-    };
     json = nlohmann::json{
-        {"uuid", pvs.uuid()}, {"timestamp", pvs.timestamp()}, {"mask", getMask()}};
+        {"uuid", pvs.uuid()},
+        {"timestamp", pvs.timestamp()},
+        {"snaps", {{"mask", pvs.getSnapMask()}, {"pictures", pvs.getSnapUrls()}}},
+        {"tracks", {{"num", pvs.numOfTracks()}, {"pictures", pvs.getTrackUrls()}}}};
 }
 
 nlohmann::json PicturePreviewHandler::listPreview(const std::string& prev, size_t limit)
@@ -132,11 +183,22 @@ nlohmann::json PicturePreviewHandler::listPreview(const std::string& prev, size_
     return nlohmann::json{{"pictures", pics}};
 }
 
-PicturePreviewHandler::Response PicturePreviewHandler::visitPreview(const HttpSession::Request& req)
+PicturePreviewHandler::Response PicturePreviewHandler::visitPreview(const Request& req)
 {
-    auto getPicture = [this](const std::string& uuid, size_t index) {
+    using boost::beast::http::field;
+    using boost::beast::http::status;
+
+    auto getPicture = [this](const std::string& uuid, const std::string& name, size_t index) {
         std::unique_lock<std::mutex> lock(mutex);
-        return pictures.at(uuid).picture(index);
+        if(name == "snaps")
+        {
+            return pictures.at(uuid).snap(index);
+        }
+        else if(name == "tracks")
+        {
+            return pictures.at(uuid).track(index);
+        }
+        throw std::out_of_range({});
     };
 
     std::vector<std::string> paths;
@@ -144,14 +206,15 @@ PicturePreviewHandler::Response PicturePreviewHandler::visitPreview(const HttpSe
     boost::split(paths, uri, boost::is_any_of("/"), boost::token_compress_on);
     size_t index{0};
     boost::conversion::try_lexical_convert(paths.at(paths.size() - 1), index);
-    std::string& uuid = paths.at(paths.size() - 2);
+    std::string& name = paths.at(paths.size() - 2);
+    std::string& uuid = paths.at(paths.size() - 3);
 
     try
     {
-        auto picture = getPicture(uuid, index);
-        Response res{utils::HttpStatus::ok, req.version()};
-        res.set(utils::HttpField::server, BOOST_BEAST_VERSION_STRING);
-        res.set(utils::HttpField::content_type, "image/jpeg");
+        auto picture = getPicture(uuid, name, index);
+        Response res{status::ok, req.version()};
+        res.set(field::server, utils::getServerSignature());
+        res.set(field::content_type, "image/jpeg");
         res.keep_alive(req.keep_alive());
         res.body() = picture->getData();
         res.prepare_payload();
@@ -163,10 +226,9 @@ PicturePreviewHandler::Response PicturePreviewHandler::visitPreview(const HttpSe
     }
 }
 
-void PicturePreviewHandler::handleRequest(HttpSession::Request&& req, HttpSession::Queue& send)
+void PicturePreviewHandler::handleRequest(Request&& req, HttpSession::Queue& send)
 {
-    using HttpVerb = boost::beast::http::verb;
-    if(req.method() != HttpVerb::get)
+    if(req.method() != boost::beast::http::verb::get)
     {
         return send(utils::createJsonBadRequest(req, "Unsupported method."));
     }

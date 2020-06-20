@@ -24,11 +24,12 @@ public:
         std::string mess;
     };
 
-    using HandlerFunction = std::function<nlohmann::json(HttpSession::Request&)>;
+    using Request = boost::beast::http::request<boost::beast::http::string_body>;
+    using HandlerFunction = std::function<nlohmann::json(Request&)>;
 
     explicit JsonApiRequestHandler(HandlerFunction);
 
-    void handleRequest(HttpSession::Request&&, HttpSession::Queue&);
+    void handleRequest(Request&&, HttpSession::Queue&);
 
 private:
     HandlerFunction func;

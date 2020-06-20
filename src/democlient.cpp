@@ -2,34 +2,50 @@
 #include "HttpClient.hpp"
 #include <string>
 
-int postPictures(const PostPicture* pictures, unsigned int length)
+int postPictures(const PostPicture* snaps, unsigned int numOfSnaps,
+                 const PostPicture* tracks, unsigned int numOfTracks)
 {
-    constexpr unsigned int numOfPics{5};
-    if(length != numOfPics)
+    constexpr unsigned int numOfSnapsLimit{5};
+    if(numOfSnaps != numOfSnapsLimit)
     {
         return 1;
     }
 
-    auto getTotalSize = [pictures]() -> size_t {
+    auto getTotalSize = [snaps, numOfSnaps, tracks, numOfTracks]() -> size_t {
         size_t total{0};
-        for(unsigned int i = 0; i < numOfPics; i++)
+        for(unsigned int i = 0; i < numOfSnaps; i++)
         {
             // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-            total += pictures[i].size + sizeof(uint32_t);
+            total += snaps[i].size + sizeof(uint32_t);
+        }
+        for(unsigned int i = 0; i < numOfTracks; i++)
+        {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            total += tracks[i].size + sizeof(uint32_t);
         }
         return total;
     };
 
-    auto fillData = [pictures](std::string& data) {
+    auto fillData = [snaps, numOfSnaps, tracks, numOfTracks](std::string& data) {
         auto pc = &data.at(0);
-        for(unsigned int i = 0; i < numOfPics; i++)
+        for(unsigned int i = 0; i < numOfSnaps; i++)
         {
-            uint32_t length = pictures[i].size; // NOLINT
+            uint32_t length = snaps[i].size; // NOLINT
             *(pc++) = static_cast<uint8_t>((length & 0xff000000) >> 24); // NOLINT
             *(pc++) = static_cast<uint8_t>((length & 0x00ff0000) >> 16); // NOLINT
             *(pc++) = static_cast<uint8_t>((length & 0x0000ff00) >> 8); // NOLINT
-            *(pc++) = static_cast<uint8_t>(length & 0x000000ff); // NOLINT
-            std::copy(pictures[i].data, pictures[i].data + length, pc); // NOLINT
+            *(pc++) = static_cast<uint8_t>(length & 0x000000ff);  // NOLINT
+            std::copy(snaps[i].data, snaps[i].data + length, pc); // NOLINT
+            std::advance(pc, length);
+        }
+        for(unsigned int i = 0; i < numOfTracks; i++)
+        {
+            uint32_t length = tracks[i].size; // NOLINT
+            *(pc++) = static_cast<uint8_t>((length & 0xff000000) >> 24); // NOLINT
+            *(pc++) = static_cast<uint8_t>((length & 0x00ff0000) >> 16); // NOLINT
+            *(pc++) = static_cast<uint8_t>((length & 0x0000ff00) >> 8); // NOLINT
+            *(pc++) = static_cast<uint8_t>(length & 0x000000ff);    // NOLINT
+            std::copy(tracks[i].data, tracks[i].data + length, pc); // NOLINT
             std::advance(pc, length);
         }
     };

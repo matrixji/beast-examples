@@ -11,8 +11,9 @@ int main(int argc, char* argv[])
         printf("usage: %s <jpeg-file>\n", argv[0]);
         exit(1);
     }
-    const unsigned int nums = 5;
-    PostPicture pics[nums];
+    const unsigned int numOfSnaps = 5;
+    const unsigned int numOfTracks = 6;
+    PostPicture pics[numOfSnaps + numOfTracks];
     FILE* fp = NULL;
 
     fp = fopen(argv[1], "rb");
@@ -26,7 +27,7 @@ int main(int argc, char* argv[])
     long fileSize = ftell(fp);
     fseek(fp, 0, SEEK_SET);
 
-    for(index = 0; index < nums; ++index)
+    for(index = 0; index < numOfSnaps + numOfTracks; ++index)
     {
         pics[index].width = 0;
         pics[index].height = 0;
@@ -43,9 +44,9 @@ int main(int argc, char* argv[])
         }
     }
 
-    int ret = postPictures(pics, nums);
+    int ret = postPictures(pics, numOfSnaps, &pics[numOfSnaps], numOfTracks);
 
-    for(index = 0; index < nums; ++index)
+    for(index = 0; index < numOfSnaps + numOfTracks; ++index)
     {
         free(pics[index].data);
     }

@@ -11,13 +11,14 @@
 class HttpUriRouter
 {
 public:
-    using HandlerFunction =
-        std::function<void(HttpSession::Request&&, HttpSession::Queue&)>;
+    using Request = boost::beast::http::request<boost::beast::http::string_body>;
+
+    using HandlerFunction = std::function<void(Request&&, HttpSession::Queue&)>;
 
     template <typename RequestHandler>
     void registHandler(const std::string& pattern, std::shared_ptr<RequestHandler> handler)
     {
-        auto func = [handler](HttpSession::Request&& request, HttpSession::Queue& send) {
+        auto func = [handler](Request&& request, HttpSession::Queue& send) {
             handler->handleRequest(std::move(request), send);
         };
         handlers.emplace_back(std::move(buildHandler(pattern, std::move(func))));

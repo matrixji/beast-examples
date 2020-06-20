@@ -1,23 +1,33 @@
 #include "StaticRequestHandler.hpp"
-#include <boost/beast/http/basic_file_body.hpp>
-#include <boost/beast/http/message.hpp>
-#include <boost/beast/http/verb.hpp>
+#include <boost/beast/http/empty_body.hpp>
+#include <boost/beast/http/file_body.hpp>
 
-StaticRequestHandler::StaticRequestHandler(boost::beast::string_view documentRoot)
+using boost::system::error_code;
+using Request = boost::beast::http::request<boost::beast::http::string_body>;
+using Response = boost::beast::http::response<boost::beast::http::string_body>;
+
+StaticRequestHandler::StaticRequestHandler(boost::string_view documentRoot)
 : documentRoot{documentRoot}
 {
 }
 
-void StaticRequestHandler::handleRequest(HttpSession::Request&& req, HttpSession::Queue& send)
+void StaticRequestHandler::handleRequest(Request&& req, HttpSession::Queue& send)
 {
+    using boost::beast::file_mode;
+    using boost::beast::http::field;
+    using boost::beast::http::file_body;
+    using boost::beast::http::status;
+    using boost::beast::http::verb;
+    using EmptyBody = boost::beast::http::response<boost::beast::http::empty_body>;
+    using FileBody = boost::beast::http::response<boost::beast::http::file_body>;
 
-    if(req.method() != HttpVerb::get and req.method() != HttpVerb::head)
+    if(req.method() != verb::get and req.method() != verb::head)
     {
         return send(createBadRequest(req, "Unsupported method."));
     }
 
     if(req.target().empty() or req.target()[0] != '/' or
-       req.target().find("..") != boost::beast::string_view::npos)
+       req.target().find("..") != boost::string_view::npos)
     {
         return send(createBadRequest(req, "Illegal request-target"));
     }
@@ -32,10 +42,10 @@ void StaticRequestHandler::handleRequest(HttpSession::Request&& req, HttpSession
         path.append("/index.html");
     }
 
-    boost::system::error_code error;
-    boost::beast::http::file_body::value_type body;
+    error_code error;
+    file_body::value_type body;
 
-    body.open(path.c_str(), boost::beast::file_mode::scan, error);
+    body.open(path.c_str(), file_mode::scan, error);
 
     if(error == boost::system::errc::no_such_file_or_directory)
     {
@@ -50,39 +60,34 @@ void StaticRequestHandler::handleRequest(HttpSession::Request&& req, HttpSession
     const auto size = body.size();
 
     // resp for HEAD
-    if(req.method() == HttpVerb::head)
+    if(req.method() == verb::head)
     {
-        using EmptyBody = boost::beast::http::response<boost::beast::http::empty_body>;
-        EmptyBody res{HttpStatus::ok, req.version()};
-        res.set(HttpField::server, BOOST_BEAST_VERSION_STRING);
-        res.set(HttpField::content_type, getMimeType(path));
+        EmptyBody res{status::ok, req.version()};
+        res.set(field::server, utils::getServerSignature());
+        res.set(field::content_type, getMimeType(path));
         res.content_length(size);
         res.keep_alive(req.keep_alive());
         return send(std::move(res));
     }
 
     // resp for get
-    using FileBody = boost::beast::http::response<boost::beast::http::file_body>;
-    using HttpField = boost::beast::http::field;
-    using HttpStatus = boost::beast::http::status;
-
     FileBody res{std::piecewise_construct, std::make_tuple(std::move(body)),
-                 std::make_tuple(HttpStatus::ok, req.version())};
-    res.set(HttpField::server, BOOST_BEAST_VERSION_STRING);
-    res.set(HttpField::content_type, getMimeType(path));
+                 std::make_tuple(status::ok, req.version())};
+    res.set(field::server, utils::getServerSignature());
+    res.set(field::content_type, getMimeType(path));
     res.content_length(size);
     res.keep_alive(req.keep_alive());
     return send(std::move(res));
 }
 
-boost::beast::string_view StaticRequestHandler::getMimeType(boost::beast::string_view path)
+boost::string_view StaticRequestHandler::getMimeType(boost::string_view path)
 {
     using boost::beast::iequals;
     auto const ext = [&path] {
         auto const pos = path.rfind(".");
-        if(pos == boost::beast::string_view::npos)
+        if(pos == boost::string_view::npos)
         {
-            return boost::beast::string_view{};
+            return boost::string_view{};
         };
         return path.substr(pos);
     }();
@@ -161,8 +166,7 @@ boost::beast::string_view StaticRequestHandler::getMimeType(boost::beast::string
     return "application/data";
 }
 
-std::string StaticRequestHandler::pathConcat(boost::beast::string_view base,
-                                             boost::beast::string_view path)
+std::string StaticRequestHandler::pathConcat(boost::string_view base, boost::string_view path)
 {
     if(base.empty())
     {
@@ -194,36 +198,42 @@ std::string StaticRequestHandler::pathConcat(boost::beast::string_view base,
     return result;
 }
 
-StaticRequestHandler::Response
-StaticRequestHandler::createBadRequest(HttpSession::Request& req, boost::beast::string_view why)
+Response StaticRequestHandler::createBadRequest(Request& req, boost::string_view why)
 {
-    Response res{HttpStatus::bad_request, req.version()};
-    res.set(HttpField::server, BOOST_BEAST_VERSION_STRING);
-    res.set(HttpField::content_type, "text/html");
+    using boost::beast::http::field;
+    using boost::beast::http::status;
+
+    Response res{status::bad_request, req.version()};
+    res.set(field::server, utils::getServerSignature());
+    res.set(field::content_type, "text/html");
     res.keep_alive(req.keep_alive());
     res.body() = why.to_string();
     res.prepare_payload();
     return res;
 }
 
-StaticRequestHandler::Response
-StaticRequestHandler::createNotFound(HttpSession::Request& req, boost::beast::string_view target)
+Response StaticRequestHandler::createNotFound(Request& req, boost::string_view target)
 {
-    Response res{HttpStatus::not_found, req.version()};
-    res.set(HttpField::server, BOOST_BEAST_VERSION_STRING);
-    res.set(HttpField::content_type, "text/html");
+    using boost::beast::http::field;
+    using boost::beast::http::status;
+
+    Response res{status::not_found, req.version()};
+    res.set(field::server, utils::getServerSignature());
+    res.set(field::content_type, "text/html");
     res.keep_alive(req.keep_alive());
     res.body() = "The resource '" + target.to_string() + "' was not found.";
     res.prepare_payload();
     return res;
 }
 
-StaticRequestHandler::Response
-StaticRequestHandler::createServerError(HttpSession::Request& req, boost::beast::string_view what)
+Response StaticRequestHandler::createServerError(Request& req, boost::string_view what)
 {
-    Response res{HttpStatus::internal_server_error, req.version()};
-    res.set(HttpField::server, BOOST_BEAST_VERSION_STRING);
-    res.set(HttpField::content_type, "text/html");
+    using boost::beast::http::field;
+    using boost::beast::http::status;
+
+    Response res{status::internal_server_error, req.version()};
+    res.set(field::server, utils::getServerSignature());
+    res.set(field::content_type, "text/html");
     res.keep_alive(req.keep_alive());
     res.body() = "An error occurred: '" + what.to_string() + "'";
     res.prepare_payload();

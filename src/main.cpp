@@ -2,14 +2,19 @@
 #include "JsonApiRequestHandler.hpp"
 #include "PicturePreviewHandler.hpp"
 #include "StaticRequestHandler.hpp"
-#include <boost/asio/signal_set.hpp>
 #include <boost/lexical_cast/try_lexical_convert.hpp>
+#include <iostream>
 #include <memory>
 #include <string>
 #include <thread>
 
+using boost::system::error_code;
+using Request = boost::beast::http::request<boost::beast::http::string_body>;
+using Response = boost::beast::http::response<boost::beast::http::string_body>;
+
 // -----------------------------------------------------------------------
 // below code for poc purpose only, remove later.
+#include <boost/asio/signal_set.hpp>
 #include <mutex>
 #include <nlohmann/json.hpp>
 #include <unordered_map>
@@ -211,8 +216,8 @@ SamplingMock samplingMock;
 void installPoc(HttpListener& server)
 {
     // POST /api/v1/calibration/sampling/start
-    auto samplingStartHandler = std::make_shared<JsonApiRequestHandler>(
-        [](HttpSession::Request& req) -> nlohmann::json {
+    auto samplingStartHandler =
+        std::make_shared<JsonApiRequestHandler>([](Request& req) -> nlohmann::json {
             auto& body = req.body();
             // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers)
             int timeout{60};
@@ -256,8 +261,8 @@ void installPoc(HttpListener& server)
     server.registHandler("^/api/v1/calibration/sampling/start$", samplingStartHandler);
 
     // GET /api/v1/calibration/sampling/\d+
-    auto samplingStatusHandler = std::make_shared<JsonApiRequestHandler>(
-        [](HttpSession::Request& req) -> nlohmann::json {
+    auto samplingStatusHandler =
+        std::make_shared<JsonApiRequestHandler>([](Request& req) -> nlohmann::json {
             std::string target = req.target().to_string();
             auto pos = target.find('/');
             auto idStr = target.substr(pos + 1);
@@ -279,8 +284,8 @@ void installPoc(HttpListener& server)
     server.registHandler("^/api/v1/calibration/sampling/\\d+$", samplingStatusHandler);
 
     // POST /api/v1/calibration/sampling/stop
-    auto samplingStopHandler = std::make_shared<JsonApiRequestHandler>(
-        [](HttpSession::Request& req) -> nlohmann::json {
+    auto samplingStopHandler =
+        std::make_shared<JsonApiRequestHandler>([](Request& req) -> nlohmann::json {
             try
             {
                 auto json = nlohmann::json::parse(req.body());
@@ -306,12 +311,13 @@ void installPoc(HttpListener& server)
     constexpr auto picPreviewCacheNum{30};
     auto picHandler = std::make_shared<PicturePreviewHandler>(picPreviewCacheNum);
 
-    // GET /api/v1/realtime/preview/picture/<uuid>/[0-4]
-    server.registHandler("^/api/v1/realtime/preview/picture/[a-f0-9-]+/[0-9]$", picHandler);
+    // GET /api/v1/realtime/preview/snap/<uuid>/[0-4]
+    server.registHandler(
+        "^/api/v1/realtime/preview/picture/[a-f0-9-]+/(snaps|tracks)/[0-9]$", picHandler);
 
     // POST /api/v1/realtime/preview/pictures
     auto picPostHandler = std::make_shared<JsonApiRequestHandler>(
-        [picHandler](HttpSession::Request& req) -> nlohmann::json {
+        [picHandler](Request& req) -> nlohmann::json {
             const auto& body = req.body();
             auto getSize = [&body](size_t off) -> uint32_t {
                 uint32_t ret = 0;
@@ -342,12 +348,12 @@ void installPoc(HttpListener& server)
     server.registHandler("^/api/v1/realtime/preview/pictures$", picPostHandler);
 
     auto picListHandler = std::make_shared<JsonApiRequestHandler>(
-        [picHandler](HttpSession::Request& req) -> nlohmann::json {
+        [picHandler](Request& req) -> nlohmann::json {
             auto target = req.target().to_string();
             const std::string lookup = "?prev=";
             auto pos = target.rfind(lookup);
             std::string prev{""};
-            if(pos != boost::beast::string_view::npos)
+            if(pos != boost::string_view::npos)
             {
                 prev = target.substr(pos + lookup.length());
             }
@@ -362,10 +368,11 @@ void installPoc(HttpListener& server)
 
 int main(int argc, const char* argv[])
 {
+    using address = boost::asio::ip::address_v4;
+    using boost::asio::io_context;
+    using boost::asio::ip::tcp;
+
     constexpr uint16_t defaultPort{8088};
-    namespace asio = boost::asio;
-    using tcp = asio::ip::tcp;
-    using address = asio::ip::address_v4;
     size_t threads = std::thread::hardware_concurrency();
 
     const char* documentRootPath{"/root/beast-examples/cmake-build-debug"};
@@ -382,7 +389,7 @@ int main(int argc, const char* argv[])
         documentRootPath = argv[1];
     }
 
-    asio::io_context ioContext{static_cast<int>(threads)};
+    io_context ioContext{static_cast<int>(threads)};
 
     const tcp::endpoint endpoint{address::any(), listenPort};
     auto documentRoot = std::make_shared<std::string const>(documentRootPath);
@@ -394,7 +401,7 @@ int main(int argc, const char* argv[])
     {
         // install api handler
         auto versionApiHandler =
-            std::make_shared<JsonApiRequestHandler>([](HttpSession::Request&) -> std::string {
+            std::make_shared<JsonApiRequestHandler>([](Request&) -> std::string {
                 return R"({"ret":0,"version":"1.0"})";
             });
         server->registHandler("^/api/v1/version$", versionApiHandler);
@@ -408,8 +415,8 @@ int main(int argc, const char* argv[])
 
         server->run();
 
-        asio::signal_set signals(ioContext, SIGINT, SIGTERM);
-        signals.async_wait([&](boost::system::error_code const&, int) {
+        boost::asio::signal_set signals(ioContext, SIGINT, SIGTERM);
+        signals.async_wait([&](error_code const&, int) {
             // Stop the `io_context`. This will cause `run()`
             // to return immediately, eventually destroying the
             // `io_context` and all of the sockets in it.
@@ -436,6 +443,5 @@ int main(int argc, const char* argv[])
         std::cerr << "error: " << ex.what() << std::endl;
         ioContext.stop();
     }
-
     return 0;
 }

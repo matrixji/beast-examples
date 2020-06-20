@@ -1,9 +1,14 @@
 #include "HttpSession.hpp"
 #include "HttpUriRouter.hpp"
 #include "Utils.hpp"
-#include <boost/asio.hpp>
-#include <boost/beast.hpp>
+#include "WebsocketSession.hpp"
 #include <utility>
+
+using boost::asio::bind_executor;
+using boost::asio::post;
+using boost::asio::ip::tcp;
+using boost::system::error_code;
+using Request = boost::beast::http::request<boost::beast::http::string_body>;
 
 HttpSession::HttpSession(tcp::socket sock, HttpUriRouter& router)
 : socket{std::move(sock)}
@@ -19,8 +24,7 @@ void HttpSession::run()
     if(!strand.running_in_this_thread())
     {
         auto self = shared_from_this();
-        return boost::asio::post(
-            boost::asio::bind_executor(strand, [self] { self->run(); }));
+        return post(bind_executor(strand, [self] { self->run(); }));
     }
     onTimer({});
     doRead();
@@ -32,14 +36,20 @@ void HttpSession::doRead()
     constexpr int timeout{15};
     timer.expires_after(std::chrono::seconds{timeout});
 
-    request = {};
+    // reset parser.
+    parser.emplace();
+    parser->body_limit(bodyLimit);
+
+    // read header
+    // error_code error;
+    // http::read_header(socket, header, *parser, error);
 
     // read a request
     auto self = shared_from_this();
     auto callback = [self](error_code error, size_t readBytes) {
         self->onRead(error, readBytes);
     };
-    boost::beast::http::async_read(socket, buffer, request,
+    boost::beast::http::async_read(socket, buffer, *parser,
                                    bind_executor(strand, std::move(callback)));
 }
 
@@ -92,21 +102,20 @@ void HttpSession::onRead(error_code error, size_t)
     }
 
     // See if it is a WebSocket Upgrade
-    if(boost::beast::websocket::is_upgrade(request))
+    if(boost::beast::websocket::is_upgrade(parser->get()))
     {
         // Make timer expire immediately, by setting expiry to time_point::min
         // we can detect the upgrade to websocket in the timer handler
         timer.expires_at((std::chrono::steady_clock::time_point::min)());
 
         // Create a WebSocket websocket session by transferring the socket
-        // TODO: websocket
-        // std::make_shared<websocket_session>(
-        //    std::move(socket_))->do_accept(std::move(req_));
+        std::make_shared<WebsocketSession>(std::move(socket))->doAccept(parser->release());
         return;
     }
 
     // router
-    const auto& uri = request.target();
+    Request request{parser->release()};
+    auto uri = request.target();
     auto handler = router.resolve(uri.to_string());
     handler(std::move(request), queue);
 

@@ -2,8 +2,6 @@
 #define PICTURE_PREVIEW_HANDLER_HPP
 
 #include "HttpSession.hpp"
-#include <boost/beast/http/message.hpp>
-#include <boost/beast/http/string_body.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <list>
 #include <memory>
@@ -42,14 +40,26 @@ public:
 
         time_t timestamp() const;
 
-        std::shared_ptr<PictureView> picture(size_t) const;
+        size_t numOfTracks() const;
+
+        std::shared_ptr<PictureView> snap(size_t) const;
+        std::shared_ptr<PictureView> track(size_t) const;
+
+        std::vector<std::string> getSnapUrls() const;
+
+        std::vector<std::string> getTrackUrls() const;
+
+        int getSnapMask() const;
 
     private:
+        const size_t snapsLen{5};
         std::string uuid_;
         time_t timestamp_;
-        std::vector<std::shared_ptr<PictureView>> pictures;
+        std::vector<std::shared_ptr<PictureView>> snaps;
+        std::vector<std::shared_ptr<PictureView>> tracks;
     };
 
+    using Request = boost::beast::http::request<boost::beast::http::string_body>;
     using Response = boost::beast::http::response<boost::beast::http::string_body>;
 
     explicit PicturePreviewHandler(size_t);
@@ -58,9 +68,9 @@ public:
 
     nlohmann::json listPreview(const std::string&, size_t);
 
-    Response visitPreview(const HttpSession::Request&);
+    Response visitPreview(const Request&);
 
-    void handleRequest(HttpSession::Request&&, HttpSession::Queue&);
+    void handleRequest(Request&&, HttpSession::Queue&);
 
 private:
     using PictureIds = std::list<std::string>;

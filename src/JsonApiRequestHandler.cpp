@@ -1,18 +1,18 @@
 #include "JsonApiRequestHandler.hpp"
 #include "Utils.hpp"
-#include <boost/beast.hpp>
 #include <nlohmann/json.hpp>
 #include <utility>
+
+using boost::beast::http::verb;
 
 JsonApiRequestHandler::JsonApiRequestHandler(JsonApiRequestHandler::HandlerFunction func)
 : func{std::move(func)}
 {
 }
 
-void JsonApiRequestHandler::handleRequest(HttpSession::Request&& req, HttpSession::Queue& send)
+void JsonApiRequestHandler::handleRequest(Request&& req, HttpSession::Queue& send)
 {
-    using HttpVerb = boost::beast::http::verb;
-    if(req.method() != HttpVerb::get and req.method() != HttpVerb::post)
+    if(req.method() != verb::get and req.method() != verb::post)
     {
         return send(utils::createJsonBadRequest(req, "Unsupported method."));
     }

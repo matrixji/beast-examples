@@ -3,6 +3,10 @@
 #include "Utils.hpp"
 #include <boost/asio/dispatch.hpp>
 
+using boost::asio::io_context;
+using boost::asio::ip::tcp;
+using boost::system::error_code;
+
 HttpListener::HttpListener(io_context& ioContext, const tcp::endpoint& endpoint,
                            std::shared_ptr<const std::string> documentRoot)
 : socket{ioContext}, acceptor{ioContext}, documentRoot{std::move(documentRoot)}
