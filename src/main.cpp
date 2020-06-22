@@ -5,6 +5,7 @@
 #include <boost/lexical_cast/try_lexical_convert.hpp>
 #include <iostream>
 #include <memory>
+#include <spdlog/spdlog-inl.h>
 #include <string>
 #include <thread>
 
@@ -375,7 +376,7 @@ int main(int argc, const char* argv[])
     constexpr uint16_t defaultPort{8088};
     size_t threads = std::thread::hardware_concurrency();
 
-    const char* documentRootPath{"/root/beast-examples/cmake-build-debug"};
+    const char* documentRootPath{"/tmp"};
     uint16_t listenPort{defaultPort};
     if(argc >= 3)
     {
@@ -397,6 +398,10 @@ int main(int argc, const char* argv[])
     // run http server
     auto server = std::make_shared<HttpListener>(ioContext, endpoint, documentRoot);
 
+    if(server->lastError())
+    {
+        exit(1);
+    }
     try
     {
         // install api handler
@@ -440,7 +445,7 @@ int main(int argc, const char* argv[])
     }
     catch(const std::exception& ex)
     {
-        std::cerr << "error: " << ex.what() << std::endl;
+        spdlog::error("error: {}", ex.what());
         ioContext.stop();
     }
     return 0;

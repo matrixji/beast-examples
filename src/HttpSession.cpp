@@ -2,6 +2,7 @@
 #include "HttpUriRouter.hpp"
 #include "Utils.hpp"
 #include "WebsocketSession.hpp"
+#include <spdlog/spdlog-inl.h>
 #include <utility>
 
 using boost::asio::bind_executor;
@@ -16,7 +17,10 @@ HttpSession::HttpSession(tcp::socket sock, HttpUriRouter& router)
 , timer{socket.get_executor().context(), std::chrono::steady_clock::time_point::max()}
 , queue{*this}
 , router(router)
+, peerAddress{socket.remote_endpoint().address().to_string() + ":" +
+              std::to_string(socket.remote_endpoint().port())}
 {
+    spdlog::info("new session from: {}", peerAddress);
 }
 
 void HttpSession::run()
@@ -71,6 +75,7 @@ void HttpSession::onTimer(error_code error)
     {
         // Closing the socket cancels all outstanding operations. They
         // will complete with asio::error::operation_aborted
+        spdlog::info("close session: {}", peerAddress);
         socket.shutdown(tcp::socket::shutdown_both, error);
         socket.close(error);
         return;
@@ -115,8 +120,9 @@ void HttpSession::onRead(error_code error, size_t)
 
     // router
     Request request{parser->release()};
-    auto uri = request.target();
-    auto handler = router.resolve(uri.to_string());
+    auto uri = request.target().to_string();
+    auto handler = router.resolve(uri);
+    spdlog::info("session: {}, {} {}", peerAddress, request.method_string().data(), uri);
     handler(std::move(request), queue);
 
     // If we aren't at the queue limit, try to pipeline another request
@@ -157,6 +163,11 @@ void HttpSession::doClose()
     error_code error;
     socket.shutdown(tcp::socket::shutdown_both, error);
     socket.close(error);
+}
+
+const std::string& HttpSession::getPeerAddress() const
+{
+    return peerAddress;
 }
 
 HttpSession::Queue::Queue(HttpSession& session) : self(session)

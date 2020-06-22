@@ -23,13 +23,13 @@ void StaticRequestHandler::handleRequest(Request&& req, HttpSession::Queue& send
 
     if(req.method() != verb::get and req.method() != verb::head)
     {
-        return send(createBadRequest(req, "Unsupported method."));
+        return send(req, createBadRequest(req, "Unsupported method."));
     }
 
     if(req.target().empty() or req.target()[0] != '/' or
        req.target().find("..") != boost::string_view::npos)
     {
-        return send(createBadRequest(req, "Illegal request-target"));
+        return send(req, createBadRequest(req, "Illegal request-target"));
     }
 
     auto path = pathConcat(documentRoot, req.target());
@@ -49,12 +49,12 @@ void StaticRequestHandler::handleRequest(Request&& req, HttpSession::Queue& send
 
     if(error == boost::system::errc::no_such_file_or_directory)
     {
-        return send(createNotFound(req, req.target()));
+        return send(req, createNotFound(req, req.target()));
     }
 
     if(error)
     {
-        return send(createServerError(req, error.message()));
+        return send(req, createServerError(req, error.message()));
     }
 
     const auto size = body.size();
@@ -67,7 +67,7 @@ void StaticRequestHandler::handleRequest(Request&& req, HttpSession::Queue& send
         res.set(field::content_type, getMimeType(path));
         res.content_length(size);
         res.keep_alive(req.keep_alive());
-        return send(std::move(res));
+        return send(req, std::move(res));
     }
 
     // resp for get
@@ -77,7 +77,7 @@ void StaticRequestHandler::handleRequest(Request&& req, HttpSession::Queue& send
     res.set(field::content_type, getMimeType(path));
     res.content_length(size);
     res.keep_alive(req.keep_alive());
-    return send(std::move(res));
+    return send(req, std::move(res));
 }
 
 boost::string_view StaticRequestHandler::getMimeType(boost::string_view path)

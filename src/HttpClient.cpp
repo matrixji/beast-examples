@@ -13,7 +13,10 @@ using boost::system::error_code;
 constexpr auto httpVersion{11};
 
 HttpClient::HttpClient(std::string host, uint16_t port, std::string target)
-: host{std::move(host)}, port{port}, target{std::move(target)}, req{verb::post, target, httpVersion}
+: host{std::move(host)}
+, port{port}
+, target{std::move(target)}
+, req{verb::post, this->target, httpVersion}
 {
 }
 

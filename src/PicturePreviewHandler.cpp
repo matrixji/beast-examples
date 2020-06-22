@@ -230,14 +230,14 @@ void PicturePreviewHandler::handleRequest(Request&& req, HttpSession::Queue& sen
 {
     if(req.method() != boost::beast::http::verb::get)
     {
-        return send(utils::createJsonBadRequest(req, "Unsupported method."));
+        return send(req, utils::createJsonBadRequest(req, "Unsupported method."));
     }
     try
     {
-        return send(visitPreview(req));
+        return send(req, visitPreview(req));
     }
     catch(const std::exception& ex)
     {
-        return send(utils::createJsonServerError(req, ex.what()));
+        return send(req, utils::createJsonServerError(req, ex.what()));
     }
 }

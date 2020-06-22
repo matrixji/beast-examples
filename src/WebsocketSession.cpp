@@ -1,19 +1,17 @@
 #include "WebsocketSession.hpp"
 #include <boost/asio/bind_executor.hpp>
+#include <spdlog/spdlog-inl.h>
 
 using boost::asio::ip::tcp;
-using boost::system::error_code;
 using boost::beast::websocket::frame_type;
+using boost::system::error_code;
 using Request = boost::beast::http::request<boost::beast::http::string_body>;
-
 
 WebsocketSession::WebsocketSession(boost::asio::ip::tcp::socket socket)
 : ws{std::move(socket)}
 , strand{ws.get_executor()}
 , timer{ws.get_executor().context(), std::chrono::steady_clock::time_point::max()}
 {
-    auto self = shared_from_this();
-    proc = std::thread([self]() { self->processProc(); });
 }
 
 void WebsocketSession::doAccept(const Request& req)
@@ -25,8 +23,9 @@ void WebsocketSession::doAccept(const Request& req)
     onTimer({});
 
     timer.expires_after(std::chrono::seconds{timeout});
-
     auto self = shared_from_this();
+
+    // accept
     ws.async_accept(req, bind_executor(strand, [self](error_code error) {
                         self->onAccept(error);
                     }));
@@ -42,6 +41,12 @@ void WebsocketSession::onAccept(error_code error)
     {
         return utils::handleSystemError(error, "ws accept");
     }
+
+    auto self = shared_from_this();
+    // start a detach proc for processing incoming request.
+    proc = std::thread([self]() { self->processProc(); });
+    proc.detach();
+
     doRead();
 }
 
@@ -169,6 +174,7 @@ void WebsocketSession::onWrite(error_code error, size_t)
 
 void WebsocketSession::processProc()
 {
+    auto self = shared_from_this();
     auto pickMsg = [this](std::string& msg) {
         std::unique_lock<std::mutex> lock(mutexForQueue);
         if(queue.empty())
@@ -193,7 +199,7 @@ void WebsocketSession::processProc()
                 auto json = nlohmann::json::parse(msg);
                 // TODO: handle json ...
             }
-            catch(nlohmann::json::parse_error&)
+            catch(nlohmann::json::parse_error& parseError)
             {
                 // TODO:
             };

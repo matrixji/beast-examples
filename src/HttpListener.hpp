@@ -3,6 +3,7 @@
 
 #include "HttpUriRouter.hpp"
 #include <memory>
+#include <spdlog/spdlog-inl.h>
 
 class HttpListener : public std::enable_shared_from_this<HttpListener>
 {
@@ -15,14 +16,18 @@ public:
     template <typename RequestHandler>
     void registHandler(std::string pattern, std::shared_ptr<RequestHandler> handler)
     {
+        spdlog::info("register handler for '{}'", pattern);
         router.registHandler(std::move(pattern), handler);
     }
+
+    boost::system::error_code lastError() const;
 
 private:
     boost::asio::ip::tcp::socket socket;
     boost::asio::ip::tcp::acceptor acceptor;
     std::shared_ptr<std::string const> documentRoot;
     HttpUriRouter router;
+    boost::system::error_code error;
 
     void doAccept();
     void onAccept(boost::system::error_code);

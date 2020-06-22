@@ -11,6 +11,8 @@
 #include <boost/beast/http/write.hpp>
 #include <boost/make_unique.hpp>
 #include <memory>
+#include <spdlog/spdlog-inl.h>
+#include <string>
 #include <vector>
 
 class HttpUriRouter;
@@ -33,6 +35,8 @@ public:
         };
 
     public:
+        using Request = boost::beast::http::request<boost::beast::http::string_body>;
+
         explicit Queue(HttpSession& session);
 
         bool isFull() const
@@ -41,14 +45,15 @@ public:
         }
 
         template <bool isRequest, class Body, class Fields>
-        void operator()(boost::beast::http::message<isRequest, Body, Fields>&& msg)
+        void operator()(Request& req,
+                        boost::beast::http::message<isRequest, Body, Fields>&& msg)
         {
             class WorkerImpl : public Worker
             {
             public:
-                WorkerImpl(HttpSession& session,
+                WorkerImpl(HttpSession& session, std::string statusLine,
                            boost::beast::http::message<isRequest, Body, Fields>&& msg)
-                : msg(std::move(msg)), self(session)
+                : self{session}, msg{std::move(msg)}, statusLine{std::move(statusLine)}
                 {
                 }
 
@@ -60,14 +65,20 @@ public:
                     };
                     boost::beast::http::async_write(
                         self.socket, msg, boost::asio::bind_executor(self.strand, exec));
+                    spdlog::info("session: {}, {}", session->getPeerAddress(), statusLine);
                 }
 
             private:
-                boost::beast::http::message<isRequest, Body, Fields> msg;
                 HttpSession& self;
+                boost::beast::http::message<isRequest, Body, Fields> msg;
+                std::string statusLine;
             };
 
-            workers.emplace_back(boost::make_unique<WorkerImpl>(self, std::move(msg)));
+            std::stringstream statusStream;
+            statusStream << "[" << msg.result_int() << " " << msg.result()
+                         << "] " << req.method_string() << " " << req.target();
+            workers.emplace_back(boost::make_unique<WorkerImpl>(
+                self, statusStream.str(), std::move(msg)));
 
             // If there was no previous work, start this one
             if(workers.size() == 1)
@@ -98,6 +109,8 @@ public:
 
     void doClose();
 
+    const std::string& getPeerAddress() const;
+
 private:
     using RequestParser =
         boost::beast::http::request_parser<boost::beast::http::string_body>;
@@ -110,6 +123,7 @@ private:
     Queue queue;
     HttpUriRouter& router;
     boost::optional<RequestParser> parser;
+    std::string peerAddress;
 };
 
 #endif // HTTP_SESSION_HPP

@@ -1,6 +1,7 @@
 #include "Utils.hpp"
 #include <boost/beast/http/parser.hpp>
 #include <iostream>
+#include <spdlog/spdlog-inl.h>
 #include <sys/stat.h>
 
 using boost::beast::http::field;
@@ -10,14 +11,9 @@ using Request = boost::beast::http::request<boost::beast::http::string_body>;
 using RequestParser = boost::beast::http::request_parser<boost::beast::http::string_body>;
 using Response = boost::beast::http::response<boost::beast::http::string_body>;
 
-void utils::handleSystemError(error_code ec, char const* what)
+void utils::handleSystemError(error_code ec, char const* where)
 {
-    std::string mess = "System error: " + ec.message();
-    if(what)
-    {
-        mess += std::string(". ") + what;
-    }
-    std::cerr << mess << std::endl;
+    spdlog::error("System error({}): {}", where, ec.message());
 }
 
 bool utils::isDirectory(const char* path)

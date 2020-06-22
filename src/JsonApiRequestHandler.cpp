@@ -14,19 +14,20 @@ void JsonApiRequestHandler::handleRequest(Request&& req, HttpSession::Queue& sen
 {
     if(req.method() != verb::get and req.method() != verb::post)
     {
-        return send(utils::createJsonBadRequest(req, "Unsupported method."));
+        return send(req, utils::createJsonBadRequest(req, "Unsupported method."));
     }
 
     try
     {
-        return send(utils::createJsonOkRequest(req, func(req)));
+        auto msg = utils::createJsonOkRequest(req, func(req));
+        return send(req, std::move(msg));
     }
     catch(const JsonApiRequestHandler::NotFound&)
     {
-        return send(utils::createJsonNotFound(req, req.target()));
+        return send(req, utils::createJsonNotFound(req, req.target()));
     }
     catch(const std::exception& ex)
     {
-        return send(utils::createJsonServerError(req, ex.what()));
+        return send(req, utils::createJsonServerError(req, ex.what()));
     }
 }

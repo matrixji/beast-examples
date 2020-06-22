@@ -2,6 +2,7 @@
 #include "HttpSession.hpp"
 #include "Utils.hpp"
 #include <boost/asio/dispatch.hpp>
+#include <spdlog/spdlog-inl.h>
 
 using boost::asio::io_context;
 using boost::asio::ip::tcp;
@@ -12,7 +13,6 @@ HttpListener::HttpListener(io_context& ioContext, const tcp::endpoint& endpoint,
 : socket{ioContext}, acceptor{ioContext}, documentRoot{std::move(documentRoot)}
 {
     using boost::asio::socket_base;
-    error_code error;
 
     acceptor.open(endpoint.protocol(), error);
     if(error)
@@ -41,7 +41,11 @@ HttpListener::HttpListener(io_context& ioContext, const tcp::endpoint& endpoint,
         utils::handleSystemError(error, "Acceptor listen");
         return;
     }
+
+    spdlog::info("Listen on port: {}:{} success",
+                 endpoint.address().to_string(), endpoint.port());
 }
+
 void HttpListener::run()
 {
     if(acceptor.is_open())
@@ -51,6 +55,7 @@ void HttpListener::run()
                               [self, this] { doAccept(); });
     }
 }
+
 void HttpListener::doAccept()
 {
     auto self = shared_from_this();
@@ -70,4 +75,9 @@ void HttpListener::onAccept(error_code error)
         session->run();
     }
     doAccept();
+}
+
+boost::system::error_code HttpListener::lastError() const
+{
+    return error;
 }
