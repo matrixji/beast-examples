@@ -8,8 +8,6 @@ add_library(democlient
         src/HttpClient.cpp
         src/democlient.cpp
         src/Utils.cpp)
-target_include_directories(democlient PRIVATE third-part/include)
-
 
 add_executable(testclient src/testclient.c)
 target_link_libraries(testclient democlient pthread)
@@ -27,12 +25,11 @@ add_executable(beast_server
         src/PicturePreviewHandler.cpp
         src/WebsocketHandler.cpp)
 
-target_include_directories(beast_server PRIVATE third-part/include)
 target_link_libraries(beast_server PUBLIC pthread)
 
 find_package(Boost COMPONENTS REQUIRED)
 if(Boost_FOUND)
-    include_directories(${Boost_INCLUDE_DIRS})
+    include_directories(PRIVATE ${Boost_INCLUDE_DIRS} third-part/include)
     MESSAGE(STATUS "Boost_INCLUDE_DIRS = ${Boost_INCLUDE_DIRS}.")
     MESSAGE(STATUS "Boost_LIBRARIES = ${Boost_LIBRARIES}.")
     MESSAGE(STATUS "Boost_LIB_VERSION = ${Boost_LIB_VERSION}.")

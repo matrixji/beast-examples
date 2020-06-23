@@ -131,7 +131,7 @@ const std::string& PicturePreviewHandler::PictureView::getData() const
 }
 
 PicturePreviewHandler::PicturePreviewHandler(size_t cacheLimit)
-: cacheLimit{cacheLimit}
+: cacheLimit(cacheLimit)
 {
 }
 

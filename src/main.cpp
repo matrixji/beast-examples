@@ -309,7 +309,7 @@ void installPoc(HttpListener& server)
         });
     server.registHandler("^/api/v1/calibration/sampling/stop$", samplingStopHandler);
 
-    constexpr auto picPreviewCacheNum{30};
+    constexpr size_t picPreviewCacheNum{30};
     auto picHandler = std::make_shared<PicturePreviewHandler>(picPreviewCacheNum);
 
     // GET /api/v1/realtime/preview/snap/<uuid>/[0-4]

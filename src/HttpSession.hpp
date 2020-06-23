@@ -53,7 +53,7 @@ public:
             public:
                 WorkerImpl(HttpSession& session, std::string statusLine,
                            boost::beast::http::message<isRequest, Body, Fields>&& msg)
-                : self{session}, msg{std::move(msg)}, statusLine{std::move(statusLine)}
+                : self(session), msg{std::move(msg)}, statusLine{std::move(statusLine)}
                 {
                 }
 
