@@ -2,6 +2,7 @@
 #define PICTURE_PREVIEW_HANDLER_HPP
 
 #include "HttpSession.hpp"
+#include "PostPicture.hpp"
 #include <boost/uuid/uuid.hpp>
 #include <list>
 #include <memory>
@@ -17,12 +18,13 @@ public:
     class PictureView
     {
     public:
+        PictureView();
         explicit PictureView(std::string);
-        PictureView() = delete;
+        explicit PictureView(const PostPicture&);
         PictureView(const PictureView&) = delete;
         PictureView& operator=(const PictureView&) = delete;
-        PictureView(PictureView&&) noexcept;
-        PictureView& operator=(PictureView&&) noexcept;
+        PictureView(PictureView&&) noexcept = default;
+        PictureView& operator=(PictureView&&) noexcept = default;
         ~PictureView() = default;
 
         const std::string& getData() const;
@@ -64,7 +66,7 @@ public:
 
     explicit PicturePreviewHandler(size_t);
 
-    nlohmann::json createPreview(std::vector<PictureView>&& pictureViews);
+    void createPreview(std::vector<PictureView>&& pictureViews);
 
     nlohmann::json listPreview(const std::string&, size_t);
 

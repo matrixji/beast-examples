@@ -3,52 +3,51 @@
 #include <stdlib.h>
 #include <string.h>
 
-int main(int argc, char* argv[])
+size_t readFromFile(const char* filepath, char** payload)
 {
-    int index = 0;
-    if(argc == 1)
-    {
-        printf("usage: %s <jpeg-file>\n", argv[0]);
-        exit(1);
-    }
-    const unsigned int numOfSnaps = 5;
-    const unsigned int numOfTracks = 6;
-    PostPicture pics[numOfSnaps + numOfTracks];
     FILE* fp = NULL;
-
-    fp = fopen(argv[1], "rb");
+    fp = fopen(filepath, "rb");
     if(fp == NULL)
     {
-        printf("%s is not a valid file\n", argv[1]);
-        exit(1);
+        printf("%s is not a valid file\n", filepath);
+        return 0;
     }
 
     fseek(fp, 0, SEEK_END);
     long fileSize = ftell(fp);
     fseek(fp, 0, SEEK_SET);
 
-    for(index = 0; index < numOfSnaps + numOfTracks; ++index)
+    if(fileSize <= 0)
     {
-        pics[index].width = 0;
-        pics[index].height = 0;
-        pics[index].size = fileSize;
-        pics[index].data = malloc(fileSize);
-        if(index > 0)
-        {
-            // NOLINTNEXTLINE
-            memcpy(pics[index].data, pics[0].data, fileSize);
-        }
-        else
-        {
-            fread(pics[index].data, 1, fileSize, fp);
-        }
+        fclose(fp);
+        return 0;
     }
 
-    int ret = postPictures(pics, numOfSnaps, &pics[numOfSnaps], numOfTracks);
+    *payload = malloc(fileSize);
+    fread(*payload, 1, fileSize, fp);
+    fclose(fp);
+    return fileSize;
+}
 
-    for(index = 0; index < numOfSnaps + numOfTracks; ++index)
+int main(int argc, char* argv[])
+{
+    int index = 0;
+    if(argc < 6)
     {
-        free(pics[index].data);
+        printf("usage: %s <face:body> <jpeg-file> <camera-id> <person-id> "
+               "<timestamp>\n",
+               argv[0]);
+        exit(1);
     }
+    PostPicture pic;
+    pic.size = readFromFile(argv[2], &pic.data);
+    pic.width = 0;
+    pic.height = 0;
+    pic.cameraId = atoi(argv[3]);
+    pic.objectId = atoi(argv[4]);
+    pic.timestamp = atoll(argv[5]);
+    pic.objectType = (strcmp(argv[1], "face") == 0) ? face : body;
+    int ret = postPictures(&pic);
+    free(pic.data);
     return ret;
 }

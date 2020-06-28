@@ -1,71 +1,32 @@
-#include "democlient.h"
+#include "democlient.hpp"
 #include "HttpClient.hpp"
+#include "PostPicture.hpp"
+#include <nlohmann/json.hpp>
 #include <string>
 
-int postPictures(const PostPicture* snaps, unsigned int numOfSnaps,
-                 const PostPicture* tracks, unsigned int numOfTracks)
+DemoClient::DemoClient(std::string server, uint16_t port)
+: server{std::move(server)}, port(port)
 {
-    constexpr unsigned int numOfSnapsLimit{5};
-    if(numOfSnaps != numOfSnapsLimit)
-    {
-        return 1;
-    }
+}
 
-    auto getTotalSize = [snaps, numOfSnaps, tracks, numOfTracks]() -> size_t {
-        size_t total{0};
-        for(unsigned int i = 0; i < numOfSnaps; i++)
-        {
-            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-            total += snaps[i].size + sizeof(uint32_t);
-        }
-        for(unsigned int i = 0; i < numOfTracks; i++)
-        {
-            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-            total += tracks[i].size + sizeof(uint32_t);
-        }
-        return total;
-    };
+void DemoClient::post(std::string path, const nlohmann::json& json)
+{
+    std::string uri{std::move(path)};
+    HttpClient client{server, port, uri};
+    client.post("application/json", json.dump());
+}
 
-    auto fillData = [snaps, numOfSnaps, tracks, numOfTracks](std::string& data) {
-        auto pc = &data.at(0);
-        for(unsigned int i = 0; i < numOfSnaps; i++)
-        {
-            uint32_t length = snaps[i].size; // NOLINT
-            *(pc++) = static_cast<uint8_t>((length & 0xff000000) >> 24); // NOLINT
-            *(pc++) = static_cast<uint8_t>((length & 0x00ff0000) >> 16); // NOLINT
-            *(pc++) = static_cast<uint8_t>((length & 0x0000ff00) >> 8); // NOLINT
-            *(pc++) = static_cast<uint8_t>(length & 0x000000ff);  // NOLINT
-            std::copy(snaps[i].data, snaps[i].data + length, pc); // NOLINT
-            std::advance(pc, length);
-        }
-        for(unsigned int i = 0; i < numOfTracks; i++)
-        {
-            uint32_t length = tracks[i].size; // NOLINT
-            *(pc++) = static_cast<uint8_t>((length & 0xff000000) >> 24); // NOLINT
-            *(pc++) = static_cast<uint8_t>((length & 0x00ff0000) >> 16); // NOLINT
-            *(pc++) = static_cast<uint8_t>((length & 0x0000ff00) >> 8); // NOLINT
-            *(pc++) = static_cast<uint8_t>(length & 0x000000ff);    // NOLINT
-            std::copy(tracks[i].data, tracks[i].data + length, pc); // NOLINT
-            std::advance(pc, length);
-        }
-    };
-
-    std::string server{"127.0.0.1"};
-    constexpr uint16_t port{8088};
-    std::string uri{"/api/v1/realtime/preview/pictures"};
-    size_t dataLength = getTotalSize();
-    std::string data;
-    data.resize(dataLength);
-    fillData(data);
-
+int postPictures(const PostPicture* picture)
+{
+    nlohmann::json jsonData = *picture;
+    DemoClient client{"127.0.0.1", 8088};
     try
     {
-        HttpClient client{server, port, uri};
-        client.post("application/binary", std::move(data));
+        client.post("/api/v1/realtime/preview/pictures", jsonData);
+        return 0;
     }
-    catch(std::exception&)
+    catch(...)
     {
         return 1;
     }
-    return 0;
 }

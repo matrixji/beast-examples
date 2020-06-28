@@ -105,24 +105,13 @@ std::vector<std::string> PicturePreviewHandler::Pictures::getSnapUrls() const
     return ret;
 }
 
+PicturePreviewHandler::PictureView::PictureView() : PictureView(nullptr)
+{
+}
+
 PicturePreviewHandler::PictureView::PictureView(std::string data)
 : data{std::move(data)}
 {
-}
-
-PicturePreviewHandler::PictureView::PictureView(PicturePreviewHandler::PictureView&& pv) noexcept
-: data{std::move(pv.data)}
-{
-}
-
-PicturePreviewHandler::PictureView&
-PicturePreviewHandler::PictureView::operator=(PicturePreviewHandler::PictureView&& pv) noexcept
-{
-    if(this != &pv)
-    {
-        data.swap(pv.data);
-    }
-    return *this;
 }
 
 const std::string& PicturePreviewHandler::PictureView::getData() const
@@ -130,29 +119,31 @@ const std::string& PicturePreviewHandler::PictureView::getData() const
     return data;
 }
 
+PicturePreviewHandler::PictureView::PictureView(const PostPicture& picture)
+{
+    data = std::string(picture.data, picture.size);
+}
+
 PicturePreviewHandler::PicturePreviewHandler(size_t cacheLimit)
 : cacheLimit(cacheLimit)
 {
 }
 
-nlohmann::json PicturePreviewHandler::createPreview(std::vector<PictureView>&& pictureViews)
+void PicturePreviewHandler::createPreview(std::vector<PictureView>&& pictureViews)
 {
     boost::uuids::uuid uuid = boost::uuids::random_generator()();
     time_t now = std::time(nullptr);
     auto uuidStr = boost::uuids::to_string(uuid);
 
     // with lock
+    std::unique_lock<std::mutex> lock(mutex);
+    pictures.emplace(uuidStr, Pictures(uuidStr, now, std::move(pictureViews)));
+    ids.emplace_front(std::move(uuidStr));
+    while(ids.size() > cacheLimit)
     {
-        std::unique_lock<std::mutex> lock(mutex);
-        pictures.emplace(uuidStr, Pictures(uuidStr, now, std::move(pictureViews)));
-        ids.emplace_front(std::move(uuidStr));
-        while(ids.size() > cacheLimit)
-        {
-            pictures.erase(ids.back());
-            ids.pop_back();
-        }
+        pictures.erase(ids.back());
+        ids.pop_back();
     }
-    return nlohmann::json{};
 }
 
 void to_json(nlohmann::json& json, const PicturePreviewHandler::Pictures& pvs)

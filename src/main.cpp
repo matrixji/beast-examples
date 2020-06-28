@@ -1,5 +1,6 @@
 #include "HttpListener.hpp"
 #include "JsonApiRequestHandler.hpp"
+#include "PictureCache.hpp"
 #include "PicturePreviewHandler.hpp"
 #include "StaticRequestHandler.hpp"
 #include <boost/lexical_cast/try_lexical_convert.hpp>
@@ -317,34 +318,25 @@ void installPoc(HttpListener& server)
         "^/api/v1/realtime/preview/picture/[a-f0-9-]+/(snaps|tracks)/[0-9]$", picHandler);
 
     // POST /api/v1/realtime/preview/pictures
+    auto pictureCache = std::make_shared<PictureCache>(picHandler);
     auto picPostHandler = std::make_shared<JsonApiRequestHandler>(
-        [picHandler](Request& req) -> nlohmann::json {
-            const auto& body = req.body();
-            auto getSize = [&body](size_t off) -> uint32_t {
-                uint32_t ret = 0;
-                for(size_t index = off; index < off + sizeof(uint32_t); ++index)
-                {
-                    constexpr uint32_t bits{8};
-                    ret <<= bits;
-                    ret += static_cast<uint32_t>(static_cast<uint8_t>(body.at(index)));
-                }
-                return ret;
-            };
-            size_t proceed = 0;
-            size_t total = body.size();
-            std::vector<PicturePreviewHandler::PictureView> pvs;
-            std::cout << total << std::endl;
-            while(proceed < total)
+        [pictureCache](Request& req) -> nlohmann::json {
+            try
             {
-                auto nextBytes = getSize(proceed);
-                proceed += sizeof(decltype(nextBytes));
-                const char* pos = body.data();
-                std::advance(pos, proceed);
-                std::string data(pos, nextBytes);
-                pvs.emplace_back(data);
-                proceed += nextBytes;
+                PostPictureWrapper postPicture;
+                auto json = nlohmann::json::parse(req.body());
+                json.get_to(postPicture.picture());
+                pictureCache->addPicture(std::move(postPicture));
+                return nlohmann::json{};
             }
-            return picHandler->createPreview(std::move(pvs));
+            catch(const nlohmann::json::parse_error& ex)
+            {
+                throw std::runtime_error(ex.what());
+            }
+            catch(const std::exception& err)
+            {
+                throw std::runtime_error(err.what());
+            }
         });
     server.registHandler("^/api/v1/realtime/preview/pictures$", picPostHandler);
 

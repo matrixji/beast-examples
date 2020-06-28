@@ -1,19 +1,39 @@
 #ifndef DEMO_CLIENT_H
 #define DEMO_CLIENT_H
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C"
 {
 #endif
 
+    typedef enum PictureObjectType
+    {
+        body = 1,
+        face = 2
+    } PictureObjectType;
+
     // post structure for snap.
     // NOLINTNEXTLINE(modernize-use-using)
     typedef struct PostPicture
     {
-        // image width, optional.
+        // camera id
+        unsigned int cameraId;
+
+        // object id
+        unsigned int objectId;
+
+        // objectType
+        PictureObjectType objectType;
+
+        // 64bit timestamp in milliseconds
+        uint64_t timestamp;
+
+        // image width, optional(could be 0 for unknown).
         unsigned int width;
 
-        // image height. optional
+        // image height. optional(could be 0 for unknown)
         unsigned int height;
 
         // image size, 0 to identify no image
@@ -25,14 +45,9 @@ extern "C"
 
     // post snap to server
     // arguments:
-    //  snaps: start address of PostPicture[]
-    //  numOfSnaps: length of snaps, must be 5
-    //  tracks: start address of PostPicture[]
-    //  numOfTracks: length of tracks
-    //
+    //  picture: the picture to post
     // return: 0 for success, others for error.
-    int postPictures(const PostPicture* snaps, unsigned int numOfSnaps,
-                     const PostPicture* tracks, unsigned int numOfTracks);
+    int postPictures(const PostPicture* picture);
 
 #ifdef __cplusplus
 };
