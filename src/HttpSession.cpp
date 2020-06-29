@@ -1,6 +1,7 @@
 #include "HttpSession.hpp"
 #include "HttpUriRouter.hpp"
 #include "Utils.hpp"
+#include "WebsocketHandler.hpp"
 #include "WebsocketSession.hpp"
 #include <spdlog/spdlog-inl.h>
 #include <utility>
@@ -11,8 +12,10 @@ using boost::asio::ip::tcp;
 using boost::system::error_code;
 using Request = boost::beast::http::request<boost::beast::http::string_body>;
 
-HttpSession::HttpSession(tcp::socket sock, HttpUriRouter& router)
-: socket{std::move(sock)}
+HttpSession::HttpSession(tcp::socket sock, HttpUriRouter& router,
+                         WebsocketHandler& wsHandler)
+: wsHandler(wsHandler)
+, socket{std::move(sock)}
 , strand{socket.get_executor()}
 , timer{socket.get_executor().context(), std::chrono::steady_clock::time_point::max()}
 , queue{*this}
@@ -114,7 +117,8 @@ void HttpSession::onRead(error_code error, size_t)
         timer.expires_at((std::chrono::steady_clock::time_point::min)());
 
         // Create a WebSocket websocket session by transferring the socket
-        std::make_shared<WebsocketSession>(std::move(socket))->doAccept(parser->release());
+        std::make_shared<WebsocketSession>(std::move(socket), wsHandler)
+            ->doAccept(parser->release());
         return;
     }
 

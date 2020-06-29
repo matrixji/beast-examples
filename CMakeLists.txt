@@ -32,7 +32,7 @@ target_link_libraries(beast_server PUBLIC pthread)
 
 find_package(Boost COMPONENTS REQUIRED)
 if (Boost_FOUND)
-    include_directories(PRIVATE
+    include_directories(
         ${Boost_INCLUDE_DIRS}
         $(CMAKE_CURRENT_SOURCE_DIR)/third-part/include
         $(CMAKE_CURRENT_SOURCE_DIR)/src)
@@ -52,7 +52,7 @@ else ()
 endif ()
 
 # extra flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 
 
 enable_testing()

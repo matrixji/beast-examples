@@ -6,7 +6,7 @@
 #include "PostPicture.hpp"
 #include <memory>
 
-class PictureCache : std::enable_shared_from_this<PictureCache>
+class PictureCache : public std::enable_shared_from_this<PictureCache>
 {
 public:
     explicit PictureCache(std::shared_ptr<PicturePreviewHandler>);

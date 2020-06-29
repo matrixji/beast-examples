@@ -2,8 +2,10 @@
 #define HTTP_LISTENER_HPP
 
 #include "HttpUriRouter.hpp"
+#include "WebsocketHandler.hpp"
 #include <memory>
 #include <spdlog/spdlog-inl.h>
+
 
 class HttpListener : public std::enable_shared_from_this<HttpListener>
 {
@@ -27,6 +29,7 @@ private:
     boost::asio::ip::tcp::acceptor acceptor;
     std::shared_ptr<std::string const> documentRoot;
     HttpUriRouter router;
+    WebsocketHandler wsHandler;
     boost::system::error_code error;
 
     void doAccept();

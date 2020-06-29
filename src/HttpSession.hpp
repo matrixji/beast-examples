@@ -16,6 +16,7 @@
 #include <vector>
 
 class HttpUriRouter;
+class WebsocketHandler;
 
 class HttpSession : public std::enable_shared_from_this<HttpSession>
 {
@@ -95,7 +96,7 @@ public:
         std::vector<std::unique_ptr<Worker>> workers;
     };
 
-    HttpSession(boost::asio::ip::tcp::socket, HttpUriRouter&);
+    HttpSession(boost::asio::ip::tcp::socket, HttpUriRouter&, WebsocketHandler& wsHandler);
 
     void run();
 
@@ -115,6 +116,7 @@ private:
     using RequestParser =
         boost::beast::http::request_parser<boost::beast::http::string_body>;
 
+    WebsocketHandler& wsHandler;
     const size_t bodyLimit{32 * 1024 * 1024};
     boost::asio::ip::tcp::socket socket;
     boost::asio::strand<boost::asio::io_context::executor_type> strand;

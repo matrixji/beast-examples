@@ -11,11 +11,13 @@
 #include <mutex>
 #include <thread>
 
+class WebsocketHandler;
+
 class WebsocketSession : public std::enable_shared_from_this<WebsocketSession>
 {
 public:
     using Request = boost::beast::http::request<boost::beast::http::string_body>;
-    explicit WebsocketSession(boost::asio::ip::tcp::socket);
+    explicit WebsocketSession(boost::asio::ip::tcp::socket, WebsocketHandler&);
 
     void doAccept(const Request&);
 
@@ -39,6 +41,7 @@ public:
     void onWrite(boost::system::error_code, size_t);
 
 private:
+    WebsocketHandler& handler;
     const int defaultTimeout{15};
     using MsgQueue = std::list<std::string>;
 

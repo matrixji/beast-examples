@@ -4,6 +4,7 @@
 #include <boost/archive/iterators/transform_width.hpp>
 #include <chrono>
 #include <nlohmann/json.hpp>
+#include <spdlog/spdlog-inl.h>
 #include <sstream>
 
 void to_json(nlohmann::json& json, const PostPicture& picture)
@@ -107,6 +108,7 @@ void freePicture(PostPicture* pic)
 {
     if(pic->data)
     {
+        spdlog::info("Free picture data, obj: {}, camera: {}", pic->objectId, pic->cameraId);
         ::free(pic->data);
     }
     free(pic);
@@ -114,6 +116,7 @@ void freePicture(PostPicture* pic)
 
 PostPictureWrapper::PostPictureWrapper() : PostPictureWrapper(createPicture())
 {
+    spdlog::info("Create new empty picture");
 }
 
 PostPicture& PostPictureWrapper::picture()
@@ -125,6 +128,8 @@ PostPictureWrapper::PostPictureWrapper(PostPicture* picture)
 {
     picture_.reset(picture);
     timestamp_ = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    spdlog::info("Assign picture data, obj: {}, camera: {}", picture_->objectId,
+                 picture_->cameraId);
 }
 
 time_t PostPictureWrapper::timestamp() const

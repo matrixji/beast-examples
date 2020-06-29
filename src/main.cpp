@@ -109,9 +109,10 @@ public:
 
         nlohmann::json getStatus(bool detail)
         {
-            nlohmann::json json = {
+            nlohmann::json json{
                 {"id", id},
             };
+
             if(running)
             {
                 json.emplace("status", "running");
@@ -120,6 +121,7 @@ public:
             {
                 json.emplace("status", "finished");
             }
+
             if(detail)
             {
                 json.emplace("progress", progress());
@@ -421,7 +423,7 @@ int main(int argc, const char* argv[])
         });
 
         // run with threads
-        std::vector<std::thread> runners;
+        std::vector<std::thread> runners{};
         runners.reserve(threads - 1);
         for(auto i = threads - 1; i > 0; --i)
         {

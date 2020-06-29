@@ -1,13 +1,14 @@
 #ifndef DEMO_CLIENT_H
 #define DEMO_CLIENT_H
 
-#include <stdint.h>
+#include <stdint.h> // NOLINT(modernize-deprecated-headers)
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif
 
+    // NOLINTNEXTLINE(modernize-use-using)
     typedef enum PictureObjectType
     {
         body = 1,

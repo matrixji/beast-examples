@@ -131,9 +131,27 @@ PicturePreviewHandler::PicturePreviewHandler(size_t cacheLimit)
 
 void PicturePreviewHandler::createPreview(std::vector<PictureView>&& pictureViews)
 {
-    boost::uuids::uuid uuid = boost::uuids::random_generator()();
     time_t now = std::time(nullptr);
-    auto uuidStr = boost::uuids::to_string(uuid);
+    std::string uuidStr;
+    ++seq;
+    try
+    {
+        boost::uuids::uuid uuid = boost::uuids::random_generator()();
+        uuidStr = boost::uuids::to_string(uuid);
+    }
+    catch(...)
+    {
+        try
+        {
+            boost::uuids::uuid uuid =
+                boost::uuids::string_generator()(std::to_string(seq));
+            uuidStr = boost::uuids::to_string(uuid);
+        }
+        catch(...)
+        {
+            uuidStr = std::to_string(seq);
+        }
+    }
 
     // with lock
     std::unique_lock<std::mutex> lock(mutex);
@@ -185,14 +203,14 @@ PicturePreviewHandler::Response PicturePreviewHandler::visitPreview(const Reques
         {
             return pictures.at(uuid).snap(index);
         }
-        else if(name == "tracks")
+        if(name == "tracks")
         {
             return pictures.at(uuid).track(index);
         }
         throw std::out_of_range({});
     };
 
-    std::vector<std::string> paths;
+    std::vector<std::string> paths{};
     std::string uri = req.target().to_string();
     boost::split(paths, uri, boost::is_any_of("/"), boost::token_compress_on);
     size_t index{0};

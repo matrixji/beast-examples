@@ -71,7 +71,7 @@ void HttpListener::onAccept(error_code error)
     }
     else
     {
-        auto session = std::make_shared<HttpSession>(std::move(socket), router);
+        auto session = std::make_shared<HttpSession>(std::move(socket), router, wsHandler);
         session->run();
     }
     doAccept();

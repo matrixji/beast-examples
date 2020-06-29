@@ -1,8 +1,9 @@
 #include "PictureCache.hpp"
 #include <algorithm>
+#include <spdlog/spdlog-inl.h>
 
 PictureCache::PictureCache(std::shared_ptr<PicturePreviewHandler> handler)
-: handler{std::move(handler)}
+: handler{handler}
 {
 }
 
@@ -74,6 +75,8 @@ void PictureCache::addPicture(PostPictureWrapper&& picture)
 {
     auto objectId = picture.picture().objectId;
     auto objectType = picture.picture().objectType;
+    spdlog::info("new picture coming, object: {}, camera: {}",
+                 picture.picture().objectId, picture.picture().cameraId);
     cleanup();
     // add new pic
     {

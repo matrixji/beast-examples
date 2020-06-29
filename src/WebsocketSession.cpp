@@ -1,4 +1,5 @@
 #include "WebsocketSession.hpp"
+#include "WebsocketHandler.hpp"
 #include <boost/asio/bind_executor.hpp>
 #include <spdlog/spdlog-inl.h>
 
@@ -7,8 +8,9 @@ using boost::beast::websocket::frame_type;
 using boost::system::error_code;
 using Request = boost::beast::http::request<boost::beast::http::string_body>;
 
-WebsocketSession::WebsocketSession(boost::asio::ip::tcp::socket socket)
-: ws{std::move(socket)}
+WebsocketSession::WebsocketSession(boost::asio::ip::tcp::socket socket, WebsocketHandler& handler)
+: handler(handler)
+, ws{std::move(socket)}
 , strand{ws.get_executor()}
 , timer{ws.get_executor().context(), std::chrono::steady_clock::time_point::max()}
 {
@@ -197,7 +199,6 @@ void WebsocketSession::processProc()
             try
             {
                 auto json = nlohmann::json::parse(msg);
-                // TODO: handle json ...
             }
             catch(nlohmann::json::parse_error& parseError)
             {

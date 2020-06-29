@@ -24,7 +24,7 @@ public:
         PictureView(const PictureView&) = delete;
         PictureView& operator=(const PictureView&) = delete;
         PictureView(PictureView&&) noexcept = default;
-        PictureView& operator=(PictureView&&) noexcept = default;
+        PictureView& operator=(PictureView&&) = default;
         ~PictureView() = default;
 
         const std::string& getData() const;
@@ -82,6 +82,7 @@ private:
     std::mutex mutex;
     PictureIds ids;
     PictureBlocks pictures;
+    uint64_t seq{0};
 };
 
 #endif // PICTURE_PREVIEW_HANDLER_HPP
